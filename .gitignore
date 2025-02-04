@@ -1,0 +1,94 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+media
+staticfiles
+
+# PostgreSQL
+*.pgsql
+*.sql
+
+# Docker
+**/docker-compose.override.yml
+**/docker-compose.yml
+**/Dockerfile
+**/.docker/
+
+# Environment variables
+.env
+.env.*
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Virtual environments
+venv/
+ENV/
+
+# Migrations
+**/migrations/
+*.pot
+*.pyc
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*.swp
+
+# Node modules (if used)
+node_modules/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+
+# pytest
+.pytest_cache/
+
+# Celery beat schedule files
+celerybeat-schedule
+
+# Redis dump
+*.rdb
+
+# Pip
+pip-log.txt
+pip-delete-this-directory.txt
