@@ -1,8 +1,11 @@
+import uuid
+
 from django.db import models
 from apps.tenants.models import Tenant
 
 # Modelo de Sesiones del Asistente
 class AssistantSession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     session_id = models.CharField(max_length=100, unique=True)  # ID único de la sesión de la IA
     phone_number = models.CharField(max_length=20)  # Número del cliente que interactúa con la IA
@@ -16,6 +19,7 @@ class AssistantSession(models.Model):
 
 # Modelo de Mensajes de la IA
 class AIMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     session = models.ForeignKey(AssistantSession, on_delete=models.CASCADE, related_name='messages')  # Relación con la sesión de la IA
     role = models.CharField(max_length=20, choices=[
@@ -31,6 +35,7 @@ class AIMessage(models.Model):
 
 # Modelo de Registro de Solicitudes a OpenAI
 class OpenAIRequestLog(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     request_id = models.CharField(max_length=100, unique=True)  # ID único de la solicitud
     endpoint = models.CharField(max_length=100)  # Endpoint de OpenAI utilizado

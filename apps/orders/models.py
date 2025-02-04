@@ -1,9 +1,12 @@
+import uuid
+
 from django.db import models
 from apps.menu.models import Product, Extra
 from apps.tenants.models import Tenant
 
 # Modelo de Pedidos
 class Order(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True)  # Relación con el inquilino
     phone_number = models.CharField(max_length=15)  # Número de teléfono del cliente
     order_number = models.CharField(max_length=20, unique=True)  # Número de pedido único
@@ -48,6 +51,7 @@ class Order(models.Model):
 
 # Modelo de Líneas de Pedido (Order Items)
 class OrderItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True)  # Relación con el inquilino
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)

@@ -1,8 +1,11 @@
+import uuid
+
 from django.db import models
 from apps.tenants.models import Tenant
 
 # Modelo de Alérgenos
 class Allergen(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
     name = models.CharField(max_length=50)
     description = models.TextField(blank=True, null=True)
@@ -13,6 +16,7 @@ class Allergen(models.Model):
 
 # Tabla intermedia para Productos y Alérgenos
 class ProductAllergen(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
     product = models.ForeignKey('Product', on_delete=models.CASCADE)
     allergen = models.ForeignKey(Allergen, on_delete=models.CASCADE)
@@ -22,6 +26,7 @@ class ProductAllergen(models.Model):
 
 # Modelo de Categorías
 class Category(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
@@ -36,6 +41,7 @@ class Category(models.Model):
 
 # Modelo de Extras
 class Extra(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
@@ -53,6 +59,7 @@ class Extra(models.Model):
 
 # Tabla intermedia para Extras y Alérgenos
 class ExtraAllergen(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
     extra = models.ForeignKey(Extra, on_delete=models.CASCADE)
     allergen = models.ForeignKey(Allergen, on_delete=models.CASCADE)
@@ -62,6 +69,7 @@ class ExtraAllergen(models.Model):
 
 # Tabla intermedia para Productos y Extras
 class ProductExtra(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
     product = models.ForeignKey('Product', on_delete=models.CASCADE)
     extra = models.ForeignKey(Extra, on_delete=models.CASCADE)
@@ -71,6 +79,7 @@ class ProductExtra(models.Model):
 
 # Modelo de Productos
 class Product(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
     category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)

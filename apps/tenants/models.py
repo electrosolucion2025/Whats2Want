@@ -1,7 +1,10 @@
+import uuid
+
 from django.db import models
 
 # Modelo de Inquilinos (Tenant)
 class Tenant(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)  # Nombre de la empresa o cafetería
     owner_name = models.CharField(max_length=100)  # Nombre del propietario
     phone_number = models.CharField(max_length=20)  # Teléfono de contacto

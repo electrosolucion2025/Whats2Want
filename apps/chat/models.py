@@ -1,8 +1,11 @@
+import uuid
+
 from django.db import models
 from apps.tenants.models import Tenant
 
 # Modelo de Sesión de Chat
 class ChatSession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     session_id = models.CharField(max_length=100, unique=True)  # ID único de la sesión
     phone_number = models.CharField(max_length=20)  # Número de teléfono del cliente
@@ -16,6 +19,7 @@ class ChatSession(models.Model):
 
 # Modelo de Mensajes de Chat
 class ChatMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='messages')  # Relación con la sesión de chat
     sender = models.CharField(max_length=50, choices=[
@@ -31,6 +35,7 @@ class ChatMessage(models.Model):
 
 # Modelo de Historial de Conversaciones
 class ConversationHistory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     session = models.OneToOneField(ChatSession, on_delete=models.CASCADE, related_name='history')  # Relación con la sesión de chat
     full_conversation = models.JSONField()  # Conversación completa (formato JSON)

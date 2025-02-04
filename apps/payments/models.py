@@ -1,9 +1,12 @@
+import uuid
+
 from django.db import models
 from apps.tenants.models import Tenant
 from apps.orders.models import Order
 
 # Modelo de Pagos
 class Payment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment')  # Relación con el pedido
     payment_id = models.CharField(max_length=100, unique=True)  # ID de pago generado por Redsys

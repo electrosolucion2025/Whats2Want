@@ -1,8 +1,11 @@
+import uuid
+
 from django.db import models
 from apps.tenants.models import Tenant
 
 # Modelo de Mensajes de WhatsApp
 class WhatsAppMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     message_id = models.CharField(max_length=100, unique=True)  # ID del mensaje proporcionado por WhatsApp
     from_number = models.CharField(max_length=20)  # Número del remitente
@@ -34,6 +37,7 @@ class WhatsAppMessage(models.Model):
 
 # Modelo de Eventos del Webhook
 class WebhookEvent(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     event_id = models.CharField(max_length=100, unique=True)  # ID del evento de WhatsApp
     event_type = models.CharField(max_length=50)  # Tipo de evento (mensaje recibido, entregado, etc.)
@@ -45,6 +49,7 @@ class WebhookEvent(models.Model):
 
 # Modelo de Contactos de WhatsApp
 class WhatsAppContact(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     phone_number = models.CharField(max_length=20, unique=True)  # Número del contacto
     name = models.CharField(max_length=100, blank=True, null=True)  # Nombre del contacto
@@ -56,6 +61,7 @@ class WhatsAppContact(models.Model):
 
 # Modelo de Estado de Mensajes
 class MessageStatus(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     message = models.ForeignKey(WhatsAppMessage, on_delete=models.CASCADE, related_name='statuses')  # Relación con el mensaje
     status = models.CharField(max_length=50, choices=[

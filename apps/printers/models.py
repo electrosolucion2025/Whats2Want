@@ -1,8 +1,11 @@
+import uuid
+
 from django.db import models
 from apps.tenants.models import Tenant
 
 # Modelo de Impresoras
 class Printer(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
     name = models.CharField(max_length=100)  # Nombre descriptivo de la impresora
     printer_type = models.CharField(max_length=50, choices=[
