@@ -1,7 +1,8 @@
 import uuid
 
-from django.db import models
 from apps.tenants.models import Tenant
+from datetime import timedelta
+from django.db import models
 
 # Modelo de Sesión de Chat
 class ChatSession(models.Model):

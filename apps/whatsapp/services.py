@@ -2,6 +2,8 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from datetime import datetime
 
+from requests import session
+
 from apps.whatsapp.utils import send_whatsapp_message
 
 from .models import Tenant, WebhookEvent, WhatsAppContact, WhatsAppMessage
@@ -39,10 +41,10 @@ def process_webhook_event(data):
                     save_message(message, tenant, business_phone_number)
                     
                     # 🚀 Procesar el mensaje para gestionar la sesión de chat
-                    process_whatsapp_message(message, whatsapp_contact, tenant)
+                    assistant_session = process_whatsapp_message(message, whatsapp_contact, tenant)
                     
                     # 🚀 Generar la respuesta de OpenAI
-                    ai_response = generate_openai_response(message)
+                    ai_response = generate_openai_response(message, assistant_session)
                     
                     # 🚀 Enviar la respuesta a WhatsApp
                     send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)
@@ -82,16 +84,18 @@ def save_message(message, tenant, phone_number):
     if WhatsAppMessage.objects.filter(message_id=message_id).exists():
         return
     
-    WhatsAppMessage.objects.create(
+    WhatsAppMessage.objects.get_or_create(
         message_id=message_id,
-        from_number=message_from,
-        to_number=phone_number,
-        message_type=message_type,
-        content=content,
-        status='delivered',
-        direction='inbound',
-        timestamp=timestamp,
-        tenant=tenant
+        defaults = {
+            'from_number': message_from,
+            'to_number': phone_number,
+            'message_type': message_type,
+            'content': content,
+            'status': 'delivered',
+            'direction': 'inbound',
+            'timestamp': timestamp,
+            'tenant': tenant
+        }
     )
 
 def create_webhook_event(data, tenant):

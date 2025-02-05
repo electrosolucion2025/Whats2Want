@@ -1,13 +1,16 @@
 import uuid
 
 from django.db import models
+
+from apps.chat.models import ChatSession
 from apps.tenants.models import Tenant
 
 # Modelo de Sesiones del Asistente
 class AssistantSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
-    session_id = models.CharField(max_length=100, unique=True)  # ID único de la sesión de la IA
+    session_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)  # ID único de la sesión de la IA
+    chat_session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, null=True, blank=True)  # Permitir nulos
     phone_number = models.CharField(max_length=20)  # Número del cliente que interactúa con la IA
     is_active = models.BooleanField(default=True)  # Estado de la sesión
     start_time = models.DateTimeField(auto_now_add=True)  # Inicio de la sesión
