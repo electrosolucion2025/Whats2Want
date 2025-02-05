@@ -27,29 +27,31 @@ def process_webhook_event(data):
     for entry in data.get('entry', []):
         for change in entry.get('changes', []):
             value = change.get('value', {})
-            contacts = value.get('contacts', [])
-            messages = value.get('messages', [])
             
-            # Guardar contactos
-            for contact in contacts:
-                whatsapp_contact = save_or_update_contact(contact, tenant)
+            if 'messages' in value:
+                contacts = value.get('contacts', [])
+                messages = value.get('messages', [])
                 
-                # Guardar mensajes asociados al contacto
-                for message in messages:
-                    # 🚀 Guardar el mensaje en la base de datos
-                    save_message(message, tenant, business_phone_number)
+                # Guardar contactos
+                for contact in contacts:
+                    whatsapp_contact = save_or_update_contact(contact, tenant)
                     
-                    # 🚀 Procesar el mensaje para gestionar la sesión de chat
-                    assistant_session = process_whatsapp_message(message, whatsapp_contact, tenant)
-                    
-                    # 🚀 Generar la respuesta de OpenAI
-                    ai_response = generate_openai_response(message, assistant_session)
-                    
-                    # 🚀 Enviar la respuesta a WhatsApp
-                    send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)
-                    
-                    # 🚀 Actualizar el mensaje como leído
-                    mark_message_as_read(message.get('id'), tenant)
+                    # Guardar mensajes asociados al contacto
+                    for message in messages:
+                        # 🚀 Guardar el mensaje en la base de datos
+                        save_message(message, tenant, business_phone_number)
+                        
+                        # 🚀 Procesar el mensaje para gestionar la sesión de chat
+                        assistant_session = process_whatsapp_message(message, whatsapp_contact, tenant)
+                        
+                        # 🚀 Generar la respuesta de OpenAI
+                        ai_response = generate_openai_response(message, assistant_session)
+                        
+                        # 🚀 Enviar la respuesta a WhatsApp
+                        send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)
+                        
+                        # 🚀 Actualizar el mensaje como leído
+                        mark_message_as_read(message.get('id'), tenant)
 
 def save_or_update_contact(contact, tenant):
     wa_id = contact.get('wa_id')
