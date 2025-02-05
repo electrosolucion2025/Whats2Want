@@ -1,6 +1,8 @@
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from datetime import datetime
+
+from apps.chat.services import process_whatsapp_message
 from .models import Tenant, WebhookEvent, WhatsAppContact, WhatsAppMessage
 
 def process_webhook_event(data):
@@ -31,6 +33,9 @@ def process_webhook_event(data):
                 # Guardar mensajes asociados al contacto
                 for message in messages:
                     save_message(message, tenant, phone_number)
+                    
+                    # 🚀 Procesar el mensaje para gestionar la sesión de chat
+                    process_whatsapp_message(message, whatsapp_contact, tenant)
 
 def save_or_update_contact(contact, tenant):
     wa_id = contact.get('wa_id')
