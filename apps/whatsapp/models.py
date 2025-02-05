@@ -39,7 +39,7 @@ class WhatsAppMessage(models.Model):
 class WebhookEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)  # Relación con el inquilino
-    event_id = models.CharField(max_length=100, unique=True)  # ID del evento de WhatsApp
+    event_id = models.CharField(max_length=100, unique=False)  # ID del evento de WhatsApp
     event_type = models.CharField(max_length=50)  # Tipo de evento (mensaje recibido, entregado, etc.)
     payload = models.JSONField()  # Datos completos del evento
     received_at = models.DateTimeField(auto_now_add=True)  # Fecha y hora de recepción del evento
@@ -54,7 +54,8 @@ class WhatsAppContact(models.Model):
     phone_number = models.CharField(max_length=20, unique=True)  # Número del contacto
     name = models.CharField(max_length=100, blank=True, null=True)  # Nombre del contacto
     profile_picture_url = models.URLField(blank=True, null=True)  # Foto de perfil
-    last_interaction = models.DateTimeField(blank=True, null=True)  # Última interacción
+    wa_id = models.CharField(max_length=50, unique=True)  # ID único de WhatsApp
+    last_interaction = models.DateTimeField(auto_now=True)  # Se actualiza automáticamente
 
     def __str__(self):
         return self.phone_number
