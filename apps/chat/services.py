@@ -4,6 +4,7 @@ from django.utils.timezone import now
 from apps.assistant.models import AIMessage, AssistantSession
 from apps.chat.models import ChatMessage, ChatSession
 
+# TODO: Definir el tiempo de inactividad para cerrar la sesión
 SESSION_TIMEOUT = timedelta(minutes=2)  # Tiempo de inactividad para cerrar la sesión
 
 

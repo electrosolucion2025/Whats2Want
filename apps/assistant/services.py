@@ -2,45 +2,43 @@ import uuid
 import openai
 
 from django.conf import settings
-
-from apps.assistant.models import AIMessage, OpenAIRequestLog
-from apps.tenants.models import TenantPrompt
-from apps.chat.models import ChatMessage
 from .prompt import get_base_prompt
+from apps.assistant.models import AIMessage, OpenAIRequestLog
+from apps.chat.models import ChatMessage
+from apps.menu.services import get_menu_data
+from apps.tenants.models import TenantPrompt
 
 openai.api_key = settings.OPENAI_API_KEY
-
 
 def generate_openai_response(message, session):
     user_message = message.get('text', {}).get('body')
     base_prompt = TenantPrompt.objects.filter(tenant=session.tenant, is_active=True).first()
     
-    if base_prompt:
-        prompt_content = base_prompt.content
-    else:
-        prompt_content = get_base_prompt()
+    prompt_content = base_prompt.content if base_prompt else get_base_prompt()
     
-    # 🗂️ 1️⃣ Obtener el historial de la sesión
-    context_messages = [
-        {
-            "role": msg.role if msg.role in ['user', 'assistant', 'system'] else 'user',
-            "content": msg.content
-        }
-        # for msg in session.messages.all().order_by('timestamp')
-        for msg in session.messages.order_by('-timestamp')[:30][::-1]
+    # 📋 Obtener el menú del tenant
+    menu_data = get_menu_data(session.tenant)
+    
+    # 🚀 Preparar el contexto inicial
+    messages = [
+        {"role": "system", "content": prompt_content}
     ]
     
-    # 🆕 2️⃣ Agregar el nuevo mensaje del usuario
-    context_messages.append({"role": "user", "content": user_message})
-    
-    # Combinar el prompt base con el historial de la conversación
-    messages = [{"role": "system", "content": prompt_content}] + context_messages
-    
-    # Si hay datos del menú, incluirlos en el contexto
-    # if menu_data:
-    #     messages.append({"role": "system", "content": f"Menú actual: {menu_data}"})
-    
-    # 📦 3️⃣ Preparar la solicitud a OpenAI
+    # 🗂️ Añadir el menú si existe
+    if menu_data:
+        messages.append({"role": "system", "content": f"📋 Menú actual: {menu_data}"})
+
+    # 🗂️ Añadir historial de la sesión
+    context_messages = [
+        {"role": msg.role if msg.role in ['user', 'assistant', 'system'] else 'user', "content": msg.content}
+        for msg in session.messages.order_by('-timestamp')[:30][::-1]
+    ]
+    messages += context_messages
+
+    # 🆕 Añadir el mensaje del usuario
+    messages.append({"role": "user", "content": user_message})
+
+    # 📦 Preparar la solicitud a OpenAI
     request_id = str(uuid.uuid4())
     payload = {
         "model": "gpt-4o-mini",
@@ -49,11 +47,11 @@ def generate_openai_response(message, session):
     }
     
     try:
-        # 🚀 4️⃣ Llamada a la API de OpenAI
+        # 🚀 Llamada a la API de OpenAI
         response = openai.chat.completions.create(**payload)
         ai_response = response.choices[0].message.content
         
-        # 💾 5️⃣ Guardar el mensaje de la IA en la base de datos
+        # 💾 Guardar el mensaje de la IA
         ChatMessage.objects.create(
             tenant=session.tenant,
             session=session.chat_session,
@@ -61,7 +59,6 @@ def generate_openai_response(message, session):
             message_content=ai_response
         )
         
-        # 💡 6️⃣ Guardar también en AIMessage para análisis futuros
         AIMessage.objects.create(
             tenant=session.tenant,
             session=session,
@@ -69,7 +66,7 @@ def generate_openai_response(message, session):
             content=ai_response
         )
         
-        # 📋 7️⃣ Registrar la solicitud y la respuesta en OpenAIRequestLog
+        # 📋 Registrar la solicitud y la respuesta
         OpenAIRequestLog.objects.create(
             tenant=session.tenant,
             request_id=request_id,
@@ -80,9 +77,9 @@ def generate_openai_response(message, session):
         )
         
         return ai_response
-    
+
     except Exception as e:
-        # 🚨 Registrar el error en OpenAIRequestLog
+        # 🚨 Registrar el error
         OpenAIRequestLog.objects.create(
             tenant=session.tenant,
             request_id=request_id,
