@@ -1,14 +1,13 @@
+import requests
+
+from datetime import datetime
 from django.utils import timezone
 from django.utils.timezone import make_aware
-from datetime import datetime
-
-from requests import session
-
-from apps.whatsapp.utils import send_whatsapp_message
 
 from .models import Tenant, WebhookEvent, WhatsAppContact, WhatsAppMessage
 from apps.assistant.services import generate_openai_response
 from apps.chat.services import process_whatsapp_message
+from apps.whatsapp.utils import send_whatsapp_message
 
 def process_webhook_event(data):
     # 1️⃣ Obtener el número de teléfono receptor del webhook
@@ -48,6 +47,9 @@ def process_webhook_event(data):
                     
                     # 🚀 Enviar la respuesta a WhatsApp
                     send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)
+                    
+                    # 🚀 Actualizar el mensaje como leído
+                    mark_message_as_read(message.get('id'), tenant)
 
 def save_or_update_contact(contact, tenant):
     wa_id = contact.get('wa_id')
@@ -104,3 +106,21 @@ def create_webhook_event(data, tenant):
         payload=data,
         tenant=tenant
     )
+
+def mark_message_as_read(message_id, tenant):
+    url = f"https://graph.facebook.com/v22.0/{tenant.phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {tenant.whatsapp_access_token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "status": "read",
+        "message_id": message_id
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    
+    if response.status_code != 200:
+        print(f"❌ Error al marcar como leído: {response.text}")
+    else:
+        print(f"✅ Mensaje {message_id} marcado como leído.")
