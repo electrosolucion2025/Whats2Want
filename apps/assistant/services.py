@@ -4,36 +4,47 @@ import openai
 from django.conf import settings
 
 from apps.assistant.models import AIMessage, OpenAIRequestLog
+from apps.tenants.models import TenantPrompt
 from apps.chat.models import ChatMessage
+from .prompt import get_base_prompt
 
 openai.api_key = settings.OPENAI_API_KEY
 
 
 def generate_openai_response(message, session):
     user_message = message.get('text', {}).get('body')
+    base_prompt = TenantPrompt.objects.filter(tenant=session.tenant, is_active=True).first()
+    
+    if base_prompt:
+        prompt_content = base_prompt.content
+    else:
+        prompt_content = get_base_prompt()
     
     # 🗂️ 1️⃣ Obtener el historial de la sesión
     context_messages = [
         {
-            "role": 'user' if msg.role == 'client' else 'assistant',
+            "role": msg.role if msg.role in ['user', 'assistant', 'system'] else 'user',
             "content": msg.content
         }
-        for msg in session.messages.all().order_by('timestamp')
+        # for msg in session.messages.all().order_by('timestamp')
+        for msg in session.messages.order_by('-timestamp')[:30][::-1]
     ]
     
     # 🆕 2️⃣ Agregar el nuevo mensaje del usuario
     context_messages.append({"role": "user", "content": user_message})
     
+    # Combinar el prompt base con el historial de la conversación
+    messages = [{"role": "system", "content": prompt_content}] + context_messages
+    
+    # Si hay datos del menú, incluirlos en el contexto
+    # if menu_data:
+    #     messages.append({"role": "system", "content": f"Menú actual: {menu_data}"})
+    
     # 📦 3️⃣ Preparar la solicitud a OpenAI
     request_id = str(uuid.uuid4())
     payload = {
         "model": "gpt-4o-mini",
-        "messages": [
-            {
-                "role": "system",
-                "content": "Eres un camarero que ayuda a los clientes a realizar pedidos."
-            }
-        ] + context_messages,
+        "messages": messages,
         "temperature": 0.3,
     }
     
