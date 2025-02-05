@@ -80,7 +80,7 @@ class ProductExtra(models.Model):
 # Modelo de Productos
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True)
     category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
@@ -91,13 +91,16 @@ class Product(models.Model):
     image = models.ImageField(upload_to='products/', blank=True, null=True)
     available = models.BooleanField(default=True)
     is_special = models.BooleanField(default=False)
-    preparation_time = models.PositiveIntegerField(null=True, blank=True, help_text='Tiempo en minutos')
-    spicy_level = models.PositiveIntegerField(null=True, blank=True, help_text='Nivel de picante (1-5)')
+    preparation_time = models.PositiveIntegerField(null=True, blank=True)
+    spicy_level = models.PositiveIntegerField(null=True, blank=True)
     stock = models.PositiveIntegerField(null=True, blank=True)
     calories = models.PositiveIntegerField(null=True, blank=True)
-    is_vegetarian = models.BooleanField(default=False)
-    is_vegan = models.BooleanField(default=False)
-    gluten_free = models.BooleanField(default=False)
+    
+    # ✅ Booleanos con opción de ser NULL
+    is_vegetarian = models.BooleanField(null=True, blank=True)  
+    is_vegan = models.BooleanField(null=True, blank=True)
+    gluten_free = models.BooleanField(null=True, blank=True)
+
     tags = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
