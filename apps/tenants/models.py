@@ -8,6 +8,8 @@ class Tenant(models.Model):
     name = models.CharField(max_length=100)  # Nombre de la empresa o cafetería
     owner_name = models.CharField(max_length=100)  # Nombre del propietario
     phone_number = models.CharField(max_length=20)  # Teléfono de contacto
+    phone_number_id = models.CharField(max_length=50, blank=True, null=True)  # Nuevo campo para el ID de WhatsApp Business
+    whatsapp_access_token = models.CharField(max_length=255, blank=True, null=True)  # Token de acceso para WhatsApp
     email = models.EmailField()  # Correo electrónico
     address = models.TextField(blank=True, null=True)  # Dirección física
     nif = models.CharField(max_length=20, blank=True, null=True)  # Número de identificación fiscal

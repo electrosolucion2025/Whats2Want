@@ -2,16 +2,19 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from datetime import datetime
 
-from apps.chat.services import process_whatsapp_message
+from apps.whatsapp.utils import send_whatsapp_message
+
 from .models import Tenant, WebhookEvent, WhatsAppContact, WhatsAppMessage
+from apps.assistant.services import generate_openai_response
+from apps.chat.services import process_whatsapp_message
 
 def process_webhook_event(data):
     # 1️⃣ Obtener el número de teléfono receptor del webhook
-    phone_number = data.get('entry', [])[0].get('changes', [])[0].get('value', {}).get('metadata', {}).get('display_phone_number')
+    business_phone_number = data.get('entry', [])[0].get('changes', [])[0].get('value', {}).get('metadata', {}).get('display_phone_number')
     
     # 2️⃣ Obtener el Tenant asociado a ese número
     try:
-        tenant = Tenant.objects.get(phone_number=phone_number)
+        tenant = Tenant.objects.get(phone_number=business_phone_number)
         
     except Tenant.DoesNotExist:
         raise ValueError('Tenant no encontrado para el número de teléfono')
@@ -32,10 +35,17 @@ def process_webhook_event(data):
                 
                 # Guardar mensajes asociados al contacto
                 for message in messages:
-                    save_message(message, tenant, phone_number)
+                    # 🚀 Guardar el mensaje en la base de datos
+                    save_message(message, tenant, business_phone_number)
                     
                     # 🚀 Procesar el mensaje para gestionar la sesión de chat
                     process_whatsapp_message(message, whatsapp_contact, tenant)
+                    
+                    # 🚀 Generar la respuesta de OpenAI
+                    ai_response = generate_openai_response(message)
+                    
+                    # 🚀 Enviar la respuesta a WhatsApp
+                    send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)
 
 def save_or_update_contact(contact, tenant):
     wa_id = contact.get('wa_id')
@@ -67,6 +77,10 @@ def save_message(message, tenant, phone_number):
     
     # Convertir timestamp a datetime
     timestamp = make_aware(datetime.fromtimestamp(int(timestamp)))
+    
+    # Verificar si el mensaje ya existe
+    if WhatsAppMessage.objects.filter(message_id=message_id).exists():
+        return
     
     WhatsAppMessage.objects.create(
         message_id=message_id,
