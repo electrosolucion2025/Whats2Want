@@ -1,0 +1,18 @@
+{
+    "name": "Whats2Want Dev",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "web",
+    "workspaceFolder": "/app",
+    "extensions": [
+      "ms-python.python",
+      "ms-python.vscode-pylance"
+    ],
+    "settings": {
+      "python.languageServer": "Pylance",
+      "python.analysis.autoSearchPaths": true,
+      "python.analysis.useLibraryCodeForTypes": true,
+      "python.analysis.indexing": true
+    },
+    "postCreateCommand": "pip install -r requirements.txt"
+  }
+  

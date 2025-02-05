@@ -1,21 +1,16 @@
 import json
 
-from datetime import datetime
 from django.http import HttpResponse, JsonResponse
-from django.utils import timezone
 from django.utils.decorators import method_decorator
-from django.utils.timezone import make_aware
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from .services import process_webhook_event
-from apps.tenants.models import Tenant
-from apps.whatsapp.models import WebhookEvent, WhatsAppContact, WhatsAppMessage
 
 
 @method_decorator(csrf_exempt, name='dispatch')  # 👈 Esto desactiva la verificación CSRF
 class WhatsAppWebhookView(View):
-   def get(self, request, *args, **kwargs):
+   def get(self, request):
       """Verificación del Webhook de Meta"""
       verify_token = 'R0m1n4'
       mode = request.GET.get('hub.mode')
@@ -28,7 +23,7 @@ class WhatsAppWebhookView(View):
       else:
          return HttpResponse('Verificación fallida', status=403)
 
-   def post(self, request, *args, **kwargs):
+   def post(self, request):
       """Recibir mensajes de WhatsApp"""
       try:
          data = json.loads(request.body)
