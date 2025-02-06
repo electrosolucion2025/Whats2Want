@@ -1,7 +1,7 @@
-import uuid
-import openai
 import json
+import openai
 import re
+import uuid
 
 from django.conf import settings
 from apps.orders.services import save_order_to_db
@@ -15,8 +15,19 @@ openai.api_key = settings.OPENAI_API_KEY
 
 
 def remove_json_blocks(text):
-    """Eliminar cualquier bloque JSON del texto."""
-    return re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
+    """Eliminar cualquier bloque JSON del texto, ya sea en Markdown o como parte del mensaje."""
+    
+    # 🏷️ Paso 1: Eliminar bloques JSON en formato Markdown ```json ... ```
+    text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL).strip()
+
+    # 🏷️ Paso 2: Detectar y eliminar JSON al final del texto
+    json_match = re.search(r'(\{.*"order_finalized":\s*true.*\})', text, re.DOTALL)
+    
+    if json_match:
+        print("📦 JSON detectado y eliminado:", json_match.group(1), flush=True)
+        text = text.replace(json_match.group(1), "").strip()
+
+    return text
 
 
 def generate_openai_response(message, session):

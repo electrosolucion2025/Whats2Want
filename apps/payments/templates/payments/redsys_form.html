@@ -1,0 +1,17 @@
+<html>
+    <head>
+        <title>Redirigiendo al pago...</title>
+    </head>
+    <body onload="document.forms['redsysForm'].submit()">
+        <p>Redirigiéndote a la pasarela de pago, por favor espera...</p>
+        <form id="redsysForm" name="redsysForm" action="https://sis-t.redsys.es:25443/sis/realizarPago" method="POST">
+            <input type="hidden" name="Ds_SignatureVersion" value="HMAC_SHA256_V1" />
+            <input type="hidden" name="Ds_MerchantParameters" value="{{ params }}" />
+            <input type="hidden" name="Ds_Signature" value="{{ signature }}" />
+            <noscript>
+                <p>Si no eres redirigido automáticamente, haz clic en el botón:</p>
+                <button type="submit">Pagar</button>
+            </noscript>
+        </form>
+    </body>
+</html>

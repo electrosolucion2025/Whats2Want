@@ -118,6 +118,17 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+REDSYS = {
+    "MERCHANT_CODE": os.getenv("REDSYS_MERCHANT_CODE", default="XXXXXXXX"),
+    "TERMINAL": os.getenv("REDSYS_TERMINAL", default="1"),
+    "SECRET_KEY": os.getenv("REDSYS_SECRET_KEY"),
+    "CURRENCY": os.getenv("REDSYS_CURRENCY", default="978"),  # Código de moneda (978 = Euro)
+    "URL_REDSYS": os.getenv("REDSYS_URL_REDSYS", default="https://sis.redsys.es/sis/realizarPago"),
+    "URL_NOTIFY": os.getenv("REDSYS_URL_NOTIFY", default="https://tudominio.com/payments/redsys/notify/"),
+    "URL_OK": os.getenv("REDSYS_URL_OK", default="https://tudominio.com/payments/success/"),
+    "URL_KO": os.getenv("REDSYS_URL_KO", default="https://tudominio.com/payments/failure/"),
+}
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
