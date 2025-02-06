@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from apps.orders.models import Order, OrderItem
 from apps.menu.models import Product, Extra
+from apps.payments.models import Payment
 from apps.payments.services import generate_payment_link
 from apps.whatsapp.utils import send_whatsapp_message
 
@@ -81,12 +82,23 @@ def save_order_to_db(order_data, session):
 
         print("✅ Pedido guardado correctamente en la base de datos.", flush=True)
         
+        # 🏦 **Crear registro del pago**
+        payment = Payment.objects.create(
+            tenant=order.tenant,
+            order=order,
+            payment_id=order.order_number,
+            amount=order.total_price,
+            currency="EUR",
+            status="pending",
+            payment_method="Card",
+        )
+        
         # 📦 PASO 4: Preparar el link de pago
         payment_link = generate_payment_link(order)
         
         # 📩 PASO 5: Enviar el link al usuario por WhatsApp
         message = (
-            f"🔗 Para pagar, haz clic aquí: {payment_link}\n"
+            f"🔗 Para pagar, haz clic aquí: {payment_link}\n\n"
             f"📌 Una vez completado el pago, recibirás la confirmación. 😊"
         )
         

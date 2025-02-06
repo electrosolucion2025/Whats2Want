@@ -1,3 +1,6 @@
+import base64
+import json
+
 from decimal import ROUND_HALF_UP, Decimal as D
 from django.conf import settings
 from django.urls import reverse
@@ -43,3 +46,17 @@ def generate_payment_link(order):
     Genera un link de pago de RedSys con los datos del pedido.
     """
     return f"https://5904-88-24-61-206.ngrok-free.app{reverse('redsys_redirect', args=[order.id])}"
+
+def decode_redsys_parameters(merchant_parameters: str):
+    """
+    Decodifica los parámetros de pago de Redsys desde Base64.
+    :param merchant_parameters: Cadena Base64 de Redsys.
+    :return: Diccionario con los datos decodificados.
+    """
+    try:
+        # Decodificar Base64 a JSON
+        decoded_params = base64.b64decode(merchant_parameters).decode("utf-8")
+        return json.loads(decoded_params)
+    except Exception as e:
+        print(f"❌ Error al decodificar los parámetros de Redsys: {e}", flush=True)
+        return {}
