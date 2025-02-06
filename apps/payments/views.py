@@ -1,13 +1,14 @@
 import json
+import uuid
 
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.csrf import csrf_exempt
 
-from apps.orders.models import Order
+from apps.orders.models import Order, OrderItem
 from apps.payments.models import Payment
-from apps.payments.services import PaymentServiceRedsys, decode_redsys_parameters
+from apps.payments.services import PaymentServiceRedsys, decode_redsys_parameters, generate_payment_link
 from apps.whatsapp.utils import send_whatsapp_message
 
 def redsys_payment_redirect(request, order_id):
@@ -92,17 +93,70 @@ def redsys_notify(request):
             payment.response_code = str(response_code)
             payment.save()
 
-            # 📩 **Enviar mensaje de error al usuario**
+            # 🔴 **Actualizar el estado del pedido original a "FAILED"**
+            old_order = payment.order
+            old_order.status = "FAILED"
+            old_order.payment_status = "FAILED"
+            old_order.save()
+
+            # 🔄 **Clonar el pedido con un nuevo número de pedido**
+            new_order_number = str(uuid.uuid4().int)[:12]
+
+            new_order = Order.objects.create(
+                tenant=old_order.tenant,
+                phone_number=old_order.phone_number,
+                chat_session=old_order.chat_session,
+                table_number=old_order.table_number,
+                notes=old_order.notes,
+                order_number=new_order_number,
+                status='PENDING',  # Nuevo pedido en estado pendiente
+                delivery_type=old_order.delivery_type,
+                payment_status='PENDING',
+                discount=old_order.discount,
+                tax_amount=old_order.tax_amount,
+                is_scheduled=old_order.is_scheduled,
+                total_price=old_order.total_price,
+            )
+
+            # 🔄 **Clonar los items del pedido (con related_name='items')**
+            for item in old_order.items.all():  # 🔥 FIX AQUÍ 🔥
+                OrderItem.objects.create(
+                    tenant=item.tenant,
+                    order=new_order,
+                    product=item.product,
+                    quantity=item.quantity,
+                    price=item.price,
+                    exclusions=item.exclusions,
+                    special_instructions=item.special_instructions,
+                    extras=item.extras,
+                    discount=item.discount,
+                    tax_amount=item.tax_amount
+                )
+
+            # 🏦 **Crear un nuevo registro de pago para el nuevo pedido**
+            new_payment = Payment.objects.create(
+                tenant=new_order.tenant,
+                order=new_order,  # 🔥 Asociamos el nuevo pago al nuevo pedido
+                payment_id=new_order_number,  # 🔥 Nuevo número de pedido como ID de pago
+                amount=new_order.total_price,
+                status="pending",
+            )
+
+            # 📦 **Generar un nuevo link de pago**
+            new_payment_link = generate_payment_link(new_order)
+
+            # 📩 **Enviar mensaje de error al usuario con el nuevo link**
             failure_message = (
                 f"❌ Tu pago no se ha completado.\n"
-                f"📌 Pedido: {payment.order.order_number}\n"
-                f"💰 Total: {payment.amount}€\n"
-                f"📩 Inténtalo de nuevo con este enlace: {payment.order.get_payment_link()}"
+                f"📌 Nuevo Pedido: {new_order.order_number}\n"
+                f"💰 Total: {new_payment.amount}€\n"
+                f"📩 Inténtalo de nuevo con este enlace: {new_payment_link}"
             )
-            send_whatsapp_message(payment.order.phone_number, failure_message, tenant=payment.order.tenant)
+            send_whatsapp_message(new_order.phone_number, failure_message, tenant=new_order.tenant)
 
-            print(f"❌ Pago fallido para el pedido {order.id}", flush=True)
-            return JsonResponse({"status": "failed", "message": "Pago rechazado"})
+            print(f"❌ Pago fallido, pedido marcado como 'FAILED', generado nuevo pedido y link para el usuario {new_order.id}", flush=True)
+            return JsonResponse({"status": "failed", "message": "Pago rechazado, se generó un nuevo link"})
+
 
     except Exception as e:
         print(f"❌ Error procesando notificación de Redsys: {e}", flush=True)
