@@ -70,6 +70,7 @@ Thumbs.db
 # Backup files
 *.bak
 *.swp
+/backups/*.sql
 
 # Node modules (if used)
 node_modules/

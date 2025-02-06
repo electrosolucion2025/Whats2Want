@@ -1,10 +1,15 @@
 import uuid
 from decimal import Decimal
+
 from apps.orders.models import Order, OrderItem
 from apps.menu.models import Product, Extra
+from apps.payments.services import generate_payment_link
+from apps.whatsapp.utils import send_whatsapp_message
 
 def generate_order_number():
-    return str(uuid.uuid4()).replace('-', '')[:12].upper().zfill(12)
+    number_generated = str(int(uuid.uuid4().int))[:12]
+    print(f"🔢 Número de pedido generado: {number_generated}", flush=True)
+    return number_generated  # Convierte UUID a número y toma 12 dígitos
 
 def save_order_to_db(order_data, session):
     print(f"🔍 Guardando pedido: {order_data}", flush=True)
@@ -71,10 +76,22 @@ def save_order_to_db(order_data, session):
 
             total_price += order_item.final_price
 
-        order.total_price = total_price - order.discount + order.tax_amount
+        order.total_price = Decimal(total_price - order.discount + order.tax_amount).quantize(Decimal("0.01"))
         order.save()
 
         print("✅ Pedido guardado correctamente en la base de datos.", flush=True)
+        
+        # 📦 PASO 4: Preparar el link de pago
+        payment_link = generate_payment_link(order)
+        
+        # 📩 PASO 5: Enviar el link al usuario por WhatsApp
+        message = (
+            f"🔗 Para pagar, haz clic aquí: {payment_link}\n"
+            f"📌 Una vez completado el pago, recibirás la confirmación. 😊"
+        )
+        
+        send_whatsapp_message(session.phone_number, message, tenant=session.tenant)
+        print(f"✉️ Mensaje enviado al usuario: {message}", flush=True)
 
     except Exception as e:
         print(f"❌ Error al guardar el pedido: {e}", flush=True)
