@@ -100,6 +100,8 @@ class Product(models.Model):
     is_vegetarian = models.BooleanField(null=True, blank=True)  
     is_vegan = models.BooleanField(null=True, blank=True)
     gluten_free = models.BooleanField(null=True, blank=True)
+    
+    print_zones = models.ManyToManyField('printers.PrinterZone', blank=True)
 
     tags = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
