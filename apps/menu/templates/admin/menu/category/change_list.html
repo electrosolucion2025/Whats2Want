@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  <li>
+    <a href="{{ import_menu_url }}" class="button" style="background:#28a745; color:white; padding:5px 10px; border-radius:5px;">
+      📥 Importar Menú
+    </a>
+  </li>
+  {{ block.super }}
+{% endblock %}

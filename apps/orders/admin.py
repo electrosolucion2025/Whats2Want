@@ -121,4 +121,3 @@ class OrderItemAdmin(admin.ModelAdmin):
         )
 
     formatted_exclusions.short_description = "Exclusiones"
-    

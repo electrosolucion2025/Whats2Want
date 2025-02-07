@@ -1,111 +1,132 @@
 import uuid
-
 from django.db import models
 from apps.tenants.models import Tenant
 
 # Modelo de Alérgenos
 class Allergen(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
-    name = models.CharField(max_length=50)
-    description = models.TextField(blank=True, null=True)
-    icon = models.ImageField(upload_to='allergens/', blank=True, null=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Empresa")
+    name = models.CharField(max_length=50, verbose_name="Nombre del alérgeno")  # 🟢 Obligatorio
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    icon = models.ImageField(upload_to='allergens/', blank=True, null=True, verbose_name="Ícono del alérgeno")
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        verbose_name = "Alérgeno"
+        verbose_name_plural = "Alérgenos"
 
 # Tabla intermedia para Productos y Alérgenos
 class ProductAllergen(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
-    product = models.ForeignKey('Product', on_delete=models.CASCADE)
-    allergen = models.ForeignKey(Allergen, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Empresa")
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, verbose_name="Producto")
+    allergen = models.ForeignKey(Allergen, on_delete=models.CASCADE, verbose_name="Alérgeno")
 
     class Meta:
         unique_together = ('tenant', 'product', 'allergen')
+        verbose_name = "Relación Producto-Alérgeno"
+        verbose_name_plural = "Relaciones Productos-Alérgenos"
 
 # Modelo de Categorías
 class Category(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='categories/', blank=True, null=True)
-    order = models.PositiveIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Empresa")
+    name = models.CharField(max_length=100, verbose_name="Nombre de la categoría")  # 🟢 Obligatorio
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    image = models.ImageField(upload_to='categories/', blank=True, null=True, verbose_name="Imagen")
+    order = models.PositiveIntegerField(default=0, verbose_name="Orden de aparición")
+    is_active = models.BooleanField(default=True, verbose_name="¿Activo?")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Última actualización")
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        verbose_name = "Categoría"
+        verbose_name_plural = "Categorías"
 
 # Modelo de Extras
 class Extra(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True, null=True)
-    price = models.DecimalField(max_digits=6, decimal_places=2)
-    available = models.BooleanField(default=True)
-    allergens = models.ManyToManyField(Allergen, through='ExtraAllergen', blank=True)
-    is_default = models.BooleanField(default=False)
-    max_quantity = models.PositiveIntegerField(null=True, blank=True)
-    image = models.ImageField(upload_to='extras/', blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Empresa")
+    name = models.CharField(max_length=100, verbose_name="Nombre del extra")  # 🟢 Obligatorio
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    price = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Precio")
+    available = models.BooleanField(default=True, verbose_name="¿Disponible?")
+    allergens = models.ManyToManyField(Allergen, through='ExtraAllergen', blank=True, verbose_name="Alérgenos")
+    is_default = models.BooleanField(default=False, verbose_name="¿Seleccionado por defecto?")
+    max_quantity = models.PositiveIntegerField(null=True, blank=True, verbose_name="Cantidad máxima")
+    image = models.ImageField(upload_to='extras/', blank=True, null=True, verbose_name="Imagen")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Última actualización")
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        verbose_name = "Extra"
+        verbose_name_plural = "Extras"
 
 # Tabla intermedia para Extras y Alérgenos
 class ExtraAllergen(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
-    extra = models.ForeignKey(Extra, on_delete=models.CASCADE)
-    allergen = models.ForeignKey(Allergen, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Empresa")
+    extra = models.ForeignKey(Extra, on_delete=models.CASCADE, verbose_name="Extra")
+    allergen = models.ForeignKey(Allergen, on_delete=models.CASCADE, verbose_name="Alérgeno")
 
     class Meta:
         unique_together = ('tenant', 'extra', 'allergen')
+        verbose_name = "Relación Extra-Alérgeno"
+        verbose_name_plural = "Relaciones Extras-Alérgenos"
 
 # Tabla intermedia para Productos y Extras
 class ProductExtra(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True) # Relación con el inquilino
-    product = models.ForeignKey('Product', on_delete=models.CASCADE)
-    extra = models.ForeignKey(Extra, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Empresa")
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, verbose_name="Producto")
+    extra = models.ForeignKey(Extra, on_delete=models.CASCADE, verbose_name="Extra")
 
     class Meta:
         unique_together = ('tenant', 'product', 'extra')
+        verbose_name = "Relación Producto-Extra"
+        verbose_name_plural = "Relaciones Productos-Extras"
 
 # Modelo de Productos
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True)
-    category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True, null=True)
-    price = models.DecimalField(max_digits=6, decimal_places=2)
-    ingredients = models.TextField()
-    allergens = models.ManyToManyField(Allergen, through='ProductAllergen', blank=True)
-    extras = models.ManyToManyField(Extra, through='ProductExtra', blank=True)
-    image = models.ImageField(upload_to='products/', blank=True, null=True)
-    available = models.BooleanField(default=True)
-    is_special = models.BooleanField(default=False)
-    preparation_time = models.PositiveIntegerField(null=True, blank=True)
-    spicy_level = models.PositiveIntegerField(null=True, blank=True)
-    stock = models.PositiveIntegerField(null=True, blank=True)
-    calories = models.PositiveIntegerField(null=True, blank=True)
-    
-    # ✅ Booleanos con opción de ser NULL
-    is_vegetarian = models.BooleanField(null=True, blank=True)  
-    is_vegan = models.BooleanField(null=True, blank=True)
-    gluten_free = models.BooleanField(null=True, blank=True)
-    
-    print_zones = models.ManyToManyField('printers.PrinterZone', blank=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Empresa")
+    category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE, verbose_name="Categoría")
+    name = models.CharField(max_length=100, verbose_name="Nombre del producto")  # 🟢 Obligatorio
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    price = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Precio")
+    ingredients = models.TextField(verbose_name="Ingredientes")  # 🟢 Obligatorio
+    allergens = models.ManyToManyField(Allergen, through='ProductAllergen', blank=True, verbose_name="Alérgenos")
+    extras = models.ManyToManyField(Extra, through='ProductExtra', blank=True, verbose_name="Extras")
+    image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="Imagen")
+    available = models.BooleanField(default=True, verbose_name="¿Disponible?")
+    is_special = models.BooleanField(default=False, verbose_name="¿Especial?")
+    preparation_time = models.PositiveIntegerField(null=True, blank=True, verbose_name="Tiempo de preparación (min)")
+    spicy_level = models.PositiveIntegerField(null=True, blank=True, verbose_name="Nivel de picante (0-5)")
+    stock = models.PositiveIntegerField(null=True, blank=True, verbose_name="Stock disponible")
+    calories = models.PositiveIntegerField(null=True, blank=True, verbose_name="Calorías")
 
-    tags = models.CharField(max_length=255, blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    # ✅ Booleanos con opción de ser NULL
+    is_vegetarian = models.BooleanField(null=True, blank=True, verbose_name="¿Vegetariano?")
+    is_vegan = models.BooleanField(null=True, blank=True, verbose_name="¿Vegano?")
+    gluten_free = models.BooleanField(null=True, blank=True, verbose_name="¿Sin gluten?")
+
+    print_zones = models.ManyToManyField('printers.PrinterZone', blank=True, verbose_name="Zonas de impresión")
+
+    tags = models.CharField(max_length=255, blank=True, null=True, verbose_name="Etiquetas")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Última actualización")
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        verbose_name = "Producto"
+        verbose_name_plural = "Productos"
