@@ -16,7 +16,7 @@ class ChatSession(models.Model):
     context_data = models.JSONField(blank=True, null=True)  # Contexto de la conversación (para ChatGPT)
 
     def __str__(self):
-        return f'Session {self.session_id} - {self.phone_number}'
+        return f"Chat {str(self.id)[:8]} ({self.phone_number})"
     
     @property
     def session_duration(self):

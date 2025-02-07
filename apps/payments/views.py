@@ -79,7 +79,7 @@ def redsys_notify(request):
             # 📝 **Actualizar el estado del pedido**
             order = payment.order
             order.payment_status = "PAID"
-            order.status = "CONFIRMED"
+            order.status = "COMPLETED"
             order.save()
             
             # 🖨️ **Generar los tickets de impresión**

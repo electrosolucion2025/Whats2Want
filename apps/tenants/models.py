@@ -82,11 +82,30 @@ class Tenant(models.Model):
         return self.name
 
 class TenantPrompt(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='prompts')
-    name = models.CharField(max_length=100, default='Prompt Principal')  # Nombre del prompt
-    content = models.TextField()  # El contenido del prompt
-    is_active = models.BooleanField(default=True)  # Para activar/desactivar prompts
+    id = models.UUIDField(
+        primary_key=True, 
+        default=uuid.uuid4, 
+        editable=False, 
+        verbose_name="Unique ID"
+    )
+    tenant = models.ForeignKey(
+        Tenant, 
+        on_delete=models.CASCADE, 
+        related_name="prompts",
+        verbose_name="Associated Tenant"
+    )
+    name = models.CharField(
+        max_length=100, 
+        default="Main Prompt",
+        verbose_name="Prompt Name"
+    )  # ✅ Obligatorio
+    content = models.TextField(
+        verbose_name="Prompt Content"
+    )  # ✅ Obligatorio
+    is_active = models.BooleanField(
+        default=True, 
+        verbose_name="Is Active?"
+    )  # ✅ Obligatorio
 
     def __str__(self):
-        return f"{self.tenant.name} - {self.name}"
+        return f"{self.tenant.name} - {self.name} {'(Active)' if self.is_active else '(Inactive)'}"
