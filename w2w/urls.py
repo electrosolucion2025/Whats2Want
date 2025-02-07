@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf.urls.i18n import i18n_patterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,3 +25,17 @@ urlpatterns = [
     path('payments/', include('apps.payments.urls')),
     path('printers/', include('apps.printers.urls')),
 ]
+
+# Ruta para cambiar idioma
+
+# urlpatterns = [
+#     path('i18n/', include('django.conf.urls.i18n')),  # Ruta para cambiar idioma
+# ]
+
+# urlpatterns += i18n_patterns(
+#     path('admin/', admin.site.urls),
+#     path('menu/', include('apps.menu.urls')),
+#     path('whatsapp/', include('apps.whatsapp.urls')),
+#     path('payments/', include('apps.payments.urls')),
+#     path('printers/', include('apps.printers.urls')),
+# )
