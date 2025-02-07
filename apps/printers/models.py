@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from apps.orders.models import Order
 from apps.tenants.models import Tenant
 
 class PrinterZone(models.Model):
@@ -17,14 +18,16 @@ class PrinterZone(models.Model):
 class PrintTicket(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    order = models.ForeignKey("orders.Order", on_delete=models.CASCADE, related_name="print_tickets")
-    printer_zone = models.ForeignKey(PrinterZone, on_delete=models.CASCADE, related_name="tickets")  
-    content = models.TextField()  # Contenido del ticket
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="print_tickets")
+    printer_zone = models.ForeignKey("PrinterZone", on_delete=models.CASCADE, related_name="tickets")
+    content = models.TextField()
     status = models.CharField(max_length=20, choices=[
         ('PENDING', 'Pendiente'),
         ('PRINTED', 'Impreso'),
         ('FAILED', 'Error'),
     ], default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  # Se actualizará cuando se marque como PRINTED
 
     def __str__(self):
         return f"Ticket {self.printer_zone.name} - Pedido {self.order.order_number}"

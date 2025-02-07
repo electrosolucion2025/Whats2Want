@@ -1,7 +1,9 @@
-import json
+from datetime import datetime
+import unicodedata
 import uuid
 
 from django.conf import settings
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.csrf import csrf_exempt
@@ -9,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from apps.orders.models import Order, OrderItem
 from apps.payments.models import Payment
 from apps.payments.services import PaymentServiceRedsys, decode_redsys_parameters, generate_payment_link
+from apps.printers.models import PrintTicket
 from apps.whatsapp.utils import send_whatsapp_message
 
 def redsys_payment_redirect(request, order_id):
@@ -31,6 +34,9 @@ def redsys_notify(request):
     Procesa la notificación de Redsys y actualiza la base de datos.
     """
     try:
+        print("🔵 Entrando en redsys_notify", flush=True)
+        print(f"📥 Request Body: {request.body}", flush=True)
+        print(f"📥 Request POST: {request.POST}", flush=True)
         # ✅ Obtener datos de Redsys desde POST
         merchant_parameters = request.POST.get("Ds_MerchantParameters")
         signature = request.POST.get("Ds_Signature")
@@ -75,6 +81,10 @@ def redsys_notify(request):
             order.payment_status = "PAID"
             order.status = "CONFIRMED"
             order.save()
+            
+            # 🖨️ **Generar los tickets de impresión**
+            process_successful_payment(order)
+            print(f"🖨️ Tickets de impresión generados para el pedido {order.order_number}", flush=True)
 
             # 📩 **Enviar mensaje de confirmación al usuario**
             confirmation_message = (
@@ -171,3 +181,148 @@ def redsys_failure(request, order_id):
     """ Endpoint cuando el pago ha fallado """
     print(f"❌ Pago fallido para el pedido {order_id}", flush=True)
     return JsonResponse({"message": "El pago ha sido rechazado."}, status=400)
+
+def process_successful_payment(order):
+    """
+    Genera los tickets de impresión después de que el pago ha sido confirmado.
+    """
+    print(f"✅ Generando tickets de impresión para el pedido {order.order_number}")
+
+    # Obtener las zonas de impresión únicas para los productos del pedido
+    printer_zones = set()
+    for item in order.items.all():
+        printer_zones.update(item.product.print_zones.all())  # M2M relation
+
+    # Crear un ticket de impresión para cada zona
+    tickets = []
+    for zone in printer_zones:
+        ticket_content = generate_ticket_content(order, zone)
+        tickets.append(PrintTicket(
+            tenant=order.tenant,
+            order=order,
+            printer_zone=zone,
+            content=ticket_content,
+            status="PENDING"
+        ))
+
+    # Guardar todos los tickets en la BD de una vez
+    with transaction.atomic():
+        PrintTicket.objects.bulk_create(tickets)
+
+    print(f"🖨️ Se generaron {len(tickets)} tickets para el pedido {order.order_number}")
+    
+EMOJI_REPLACEMENTS = {
+    "🌟": "*",
+    "📅": "Fecha:",
+    "🖨️": "Zona:",
+    "📌": "Pedido:",
+    "📦": "Productos:",
+    "🥤": "[BEBIDAS]",
+    "🍽️": "[COMIDA]",
+    "✅": "[OK]",
+    "❌": "[NO]",
+    "⚠️": "[!]",
+    "📢": "Atención:"
+}
+
+def generate_ticket_content(order, printer_zone):
+    """
+    Genera el contenido del ticket según la zona de impresión, evitando caracteres no imprimibles.
+    """
+
+    # Obtener fecha y hora actual para la impresión
+    timestamp = datetime.now().strftime("%d/%m/%Y - %H:%M")
+
+    # Encabezado
+    ticket_lines = [
+        clean_text("* Bar & Restaurante XYZ *"),
+        clean_text(f"Fecha: {timestamp}"),
+        clean_text(f"Zona: {printer_zone.name}"),
+        "=" * 32,
+        clean_text(f"Pedido: #{order.order_number}"),
+        "=" * 32
+    ]
+
+    bebidas = []
+    comida = []
+
+    for item in order.items.all():
+        if printer_zone in item.product.print_zones.all():
+            item_text = clean_text(f"{item.quantity}x {item.product.name}")
+
+            if item.extras:
+                item_text += clean_text("\n  + Extras: " + ", ".join([extra['name'] for extra in item.extras]))
+
+            if item.exclusions:
+                item_text += clean_text("\n  - [NO]: " + ", ".join(item.exclusions))
+
+            if item.special_instructions:
+                item_text += clean_text("\n  ! [!] " + item.special_instructions)
+
+            if "Bebida" in item.product.category.name or "Refresco" in item.product.category.name:
+                bebidas.append(item_text)
+            else:
+                comida.append(item_text)
+
+    if bebidas:
+        ticket_lines.append(clean_text("[BEBIDAS]"))
+        ticket_lines.extend(bebidas)
+        ticket_lines.append("-" * 32)
+
+    if comida:
+        ticket_lines.append(clean_text("[COMIDA]"))
+        ticket_lines.extend(comida)
+        ticket_lines.append("-" * 32)
+
+    if order.payment_status == "PAID":
+        ticket_lines.append(clean_text("[OK] PAGO CONFIRMADO"))
+    else:
+        ticket_lines.append(clean_text("[NO] PAGO PENDIENTE"))
+
+    ticket_lines.append("=" * 32)
+    ticket_lines.append(clean_text("Atencion: ¡Gracias por tu pedido!"))
+
+    return "\n".join(ticket_lines)
+
+def clean_text(text):
+    """
+    Convierte texto a ASCII seguro para evitar caracteres no imprimibles.
+    - Elimina tildes.
+    - Sustituye emojis por texto plano.
+    """
+    # Eliminar acentos/tildes
+    text = ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+    # Reemplazar emojis por texto simple
+    for emoji, replacement in EMOJI_REPLACEMENTS.items():
+        text = text.replace(emoji, replacement)
+
+    return text
+
+# def generate_ticket_content(order, printer_zone):
+#     """
+#     Genera el contenido del ticket según la zona de impresión.
+#     """
+#     ticket_lines = [f"Pedido #{order.order_number}", "-" * 30]
+
+#     for item in order.items.all():
+#         if printer_zone in item.product.print_zones.all():
+#             ticket_lines.append(f"{item.quantity}x {item.product.name}")
+
+#             # Extras
+#             if item.extras:
+#                 ticket_lines.append(f"  + Extras: {', '.join([extra['name'] for extra in item.extras])}")
+
+#             # Exclusiones
+#             if item.exclusions:
+#                 ticket_lines.append(f"  - Sin: {', '.join(item.exclusions)}")
+
+#             # Instrucciones especiales
+#             if item.special_instructions:
+#                 ticket_lines.append(f"  ! {item.special_instructions}")
+
+#     ticket_lines.append("-" * 30)
+#     return "\n".join(ticket_lines)

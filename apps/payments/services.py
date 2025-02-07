@@ -45,7 +45,7 @@ def generate_payment_link(order):
     """
     Genera un link de pago de RedSys con los datos del pedido.
     """
-    return f"https://5904-88-24-61-206.ngrok-free.app{reverse('redsys_redirect', args=[order.id])}"
+    return f"https://4f32-88-24-61-206.ngrok-free.app{reverse('redsys_redirect', args=[order.id])}"
 
 def decode_redsys_parameters(merchant_parameters: str):
     """
