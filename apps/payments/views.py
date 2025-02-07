@@ -233,16 +233,23 @@ def generate_ticket_content(order, printer_zone):
     # Obtener fecha y hora actual para la impresión
     timestamp = datetime.now().strftime("%d/%m/%Y - %H:%M")
 
-    # Encabezado
+    # Encabezado del ticket
     ticket_lines = [
-        clean_text("* Bar & Restaurante XYZ *"),
+        clean_text("Restaurante El Mundo del Campero"),
         clean_text(f"Fecha: {timestamp}"),
         clean_text(f"Zona: {printer_zone.name}"),
         "=" * 32,
         clean_text(f"Pedido: #{order.order_number}"),
-        "=" * 32
+        clean_text(f"Teléfono: {order.phone_number}"),
     ]
 
+    # Si el pedido tiene número de mesa, lo agregamos
+    if order.table_number:
+        ticket_lines.append(clean_text(f"Mesa: {order.table_number}"))
+
+    ticket_lines.append("=" * 32)
+
+    # Dividir productos en bebidas y comida
     bebidas = []
     comida = []
 
@@ -259,21 +266,25 @@ def generate_ticket_content(order, printer_zone):
             if item.special_instructions:
                 item_text += clean_text("\n  ! [!] " + item.special_instructions)
 
+            # Separar bebidas y comida
             if "Bebida" in item.product.category.name or "Refresco" in item.product.category.name:
                 bebidas.append(item_text)
             else:
                 comida.append(item_text)
 
+    # Sección de bebidas
     if bebidas:
         ticket_lines.append(clean_text("[BEBIDAS]"))
         ticket_lines.extend(bebidas)
         ticket_lines.append("-" * 32)
 
+    # Sección de comida
     if comida:
         ticket_lines.append(clean_text("[COMIDA]"))
         ticket_lines.extend(comida)
         ticket_lines.append("-" * 32)
 
+    # Estado del pago
     if order.payment_status == "PAID":
         ticket_lines.append(clean_text("[OK] PAGO CONFIRMADO"))
     else:
@@ -296,7 +307,7 @@ def clean_text(text):
         if unicodedata.category(c) != 'Mn'
     )
 
-    # Reemplazar emojis por texto simple
+    # Reemplazar emojis por texto simple (si tienes un diccionario definido)
     for emoji, replacement in EMOJI_REPLACEMENTS.items():
         text = text.replace(emoji, replacement)
 
