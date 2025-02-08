@@ -23,6 +23,7 @@ class AssistantSession(models.Model):
     start_time = models.DateTimeField(auto_now_add=True, verbose_name="Session Start Time")  # Inicio
     end_time = models.DateTimeField(blank=True, null=True, verbose_name="Session End Time")  # Fin
     context = models.JSONField(blank=True, null=True, verbose_name="Conversation Context")  # Contexto IA
+    last_detected_language = models.CharField(max_length=5, default="es")
 
     def __str__(self):
         return f'Assistant Session {str(self.session_id)[:8]} ({self.phone_number})'

@@ -1,3 +1,4 @@
+from hmac import new
 import os
 import requests
 
@@ -57,7 +58,11 @@ def process_webhook_event(data):
                                 os.remove(audio_path)
                         
                         # 🚀 Guardar el mensaje en la base de datos
-                        save_message(message, tenant, business_phone_number, transcribed_text=transcribed_text)
+                        new_message = save_message(message, tenant, business_phone_number, transcribed_text=transcribed_text)
+                        
+                        if new_message is None:
+                            print("⚠️ Mensaje duplicado detectado. No se procesará nuevamente.")
+                            continue
                         
                         # 🚀 Procesar el mensaje para gestionar la sesión de chat
                         assistant_session = process_whatsapp_message(message, whatsapp_contact, tenant, transcribed_text=transcribed_text)
@@ -101,6 +106,10 @@ def save_message(message, tenant, phone_number, transcribed_text=None):
     message_from = message.get("from")
     message_type = message.get("type")
     timestamp = message.get("timestamp")
+    
+    # Verificar si el mensaje ya existe
+    if WhatsAppMessage.objects.filter(message_id=message_id).exists():
+        return None
 
     # Si el mensaje es de texto, extraer el contenido normal
     if message_type == "text":
@@ -113,11 +122,7 @@ def save_message(message, tenant, phone_number, transcribed_text=None):
     # Convertir timestamp a datetime
     timestamp = make_aware(datetime.fromtimestamp(int(timestamp)))
 
-    # Verificar si el mensaje ya existe
-    if WhatsAppMessage.objects.filter(message_id=message_id).exists():
-        return
-
-    WhatsAppMessage.objects.get_or_create(
+    new_message, _ = WhatsAppMessage.objects.get_or_create(
         message_id=message_id,
         defaults={
             "from_number": message_from,
@@ -130,6 +135,8 @@ def save_message(message, tenant, phone_number, transcribed_text=None):
             "tenant": tenant,
         },
     )
+    
+    return new_message
 
 def create_webhook_event(data, tenant):
     return WebhookEvent.objects.create(
