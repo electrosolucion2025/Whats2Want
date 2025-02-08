@@ -14,6 +14,7 @@ from apps.payments.models import Payment
 from apps.payments.services import PaymentServiceRedsys, decode_redsys_parameters, generate_payment_link
 from apps.printers.models import PrintTicket
 from apps.whatsapp.utils import send_whatsapp_message
+from apps.payments.utils import send_order_email
 
 def redsys_payment_redirect(request, order_id):
     """
@@ -104,6 +105,8 @@ def redsys_notify(request):
             )
             send_whatsapp_message(order.phone_number, confirmation_message, tenant=order.tenant)
 
+            send_order_email(order)  # 📧 Enviar correo con el ticket del pedido
+            
             print(f"✅ Pago exitoso para el pedido {order.id}", flush=True)
             return JsonResponse({"status": "success", "message": "Pago confirmado"})
 

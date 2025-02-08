@@ -161,3 +161,13 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# SENDGRID
+# 📧 Configuración de SendGrid
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
+
+# Opcionales
+SENDGRID_SANDBOX_MODE_IN_DEBUG = False  # En True para pruebas sin enviar correos reales
+SENDGRID_ECHO_TO_STDOUT = False  # En True para ver los correos en consola
