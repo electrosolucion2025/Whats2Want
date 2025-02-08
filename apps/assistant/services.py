@@ -29,27 +29,93 @@ def remove_json_blocks(text):
 
     return text
 
+def detect_language_openai(text):
+    """Detecta el idioma de un mensaje usando OpenAI"""
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": "Detecta el idioma de este texto y responde solo con el código de idioma ISO 639-1."},
+                      {"role": "user", "content": text}]
+        )
+        detected_lang = response.choices[0].message.content.strip()
+        return detected_lang if len(detected_lang) == 2 else "es"  # Si falla, asumimos español
+    except Exception as e:
+        print(f"⚠️ Error detectando idioma: {e}", flush=True)
+        return "es"  # Fallback a español en caso de error
+    
+def translate_text_openai(text, target_language):
+    """Traduce un texto al idioma deseado usando OpenAI."""
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "system", "content": f"Traduce este texto al {target_language}:"},
+                      {"role": "user", "content": text}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"⚠️ Error traduciendo texto: {e}", flush=True)
+        return text  # Si hay error, devolver el texto original
+
+def protect_product_names(text, product_list):
+    """
+    Sustituye los nombres de los productos en el texto por marcadores temporales
+    para evitar que se traduzcan.
+    """
+    protected_names = {}
+    for idx, product in enumerate(product_list):
+        placeholder = f"##PRODUCT{idx}##"
+        protected_names[placeholder] = product
+        text = re.sub(rf'\b{re.escape(product)}\b', placeholder, text, flags=re.IGNORECASE)
+    
+    return text, protected_names
+
+def restore_product_names(text, protected_names):
+    """
+    Restaura los nombres originales de los productos en el texto después de la traducción.
+    """
+    for placeholder, product in protected_names.items():
+        text = text.replace(placeholder, product)
+    return text
 
 def generate_openai_response(message, session, transcribed_text=None):
-    # 📌 Determinar el contenido del mensaje
+    """Genera una respuesta de OpenAI asegurando que sea en el idioma del usuario"""
+
+    # 📌 Obtener el mensaje del usuario
     user_message = transcribed_text if transcribed_text else message.get('text', {}).get('body')
 
     if not user_message:
         return "No se recibió ningún contenido válido para procesar."
-    
-    base_prompt = TenantPrompt.objects.filter(tenant=session.tenant, is_active=True).first()
 
+    # 🔍 Detectar idioma antes de continuar
+    detected_language = detect_language_openai(user_message)
+    print(f"🔍 Idioma detectado: {detected_language}", flush=True)
+
+    # 📍 Verificar si el idioma cambió en la sesión
+    if session.last_detected_language != detected_language:
+        print(f"🌍 Cambio de idioma detectado: {session.last_detected_language} → {detected_language}", flush=True)
+        session.last_detected_language = detected_language
+        session.save()
+
+    # 📋 Obtener el prompt base del tenant
+    base_prompt = TenantPrompt.objects.filter(tenant=session.tenant, is_active=True).first()
     prompt_content = base_prompt.content if base_prompt else get_base_prompt()
 
     # 📋 Obtener el menú del tenant
     menu_data = get_menu_data(session.tenant)
 
+    # 🛑 Extraer nombres de productos para protegerlos antes de traducir
+    product_names = []
+    if menu_data:
+        for category in menu_data.get("menu", []):
+            for product in category.get("items", []):
+                product_names.append(product["name"])
+
     # 🚀 Preparar el contexto inicial
     messages = [{"role": "system", "content": prompt_content}]
 
-    # 🗂️ Añadir el menú si existe
+    # 🗂️ Añadir el menú en español (sin traducción aún)
     if menu_data:
-        messages.append({"role": "system", "content": f"📋 Menú actual: {menu_data}"})
+        messages.append({"role": "system", "content": f"📋 Menú en español: {menu_data}"})
 
     # 🗂️ Añadir historial de la sesión
     context_messages = [
@@ -58,8 +124,8 @@ def generate_openai_response(message, session, transcribed_text=None):
     ]
     messages += context_messages
 
-    # 🆕 Añadir el mensaje del usuario
-    messages.append({"role": "user", "content": user_message})
+    # 🆕 Añadir el mensaje del usuario con etiqueta de idioma
+    messages.append({"role": "user", "content": f"[Idioma detectado: {detected_language}] {user_message}"})
 
     # 📦 Preparar la solicitud a OpenAI
     request_id = str(uuid.uuid4())
@@ -70,14 +136,32 @@ def generate_openai_response(message, session, transcribed_text=None):
     }
 
     try:
-        # 🚀 Llamada a la API de OpenAI
+        # 🚀 Llamada a OpenAI
         response = openai.chat.completions.create(**payload)
         ai_response = response.choices[0].message.content
         print(f"📩 Respuesta de la IA (antes de limpiar JSON): {ai_response}", flush=True)
 
         # ❌ Eliminar bloques JSON de la respuesta
         ai_response = remove_json_blocks(ai_response)
-        print(f"📩 Respuesta de la IA (después de limpiar JSON): {ai_response}", flush=True)
+
+        # 🔍 Detectar el idioma de la respuesta de OpenAI
+        response_language = detect_language_openai(ai_response).lower()
+        print(f"🔍 Idioma detectado en respuesta de OpenAI: {response_language}", flush=True)
+
+        # 🔄 Si la respuesta está en otro idioma, proteger nombres de productos antes de traducir
+        if response_language != detected_language:
+            print(f"🔄 Traduciendo respuesta de {response_language} a {detected_language}...", flush=True)
+
+            # 🚀 Proteger nombres de productos
+            ai_response_protected, protected_names = protect_product_names(ai_response, product_names)
+
+            # 🔄 Traducir el texto con nombres protegidos
+            translated_response = translate_text_openai(ai_response_protected, target_language=detected_language)
+
+            # 🔙 Restaurar nombres de productos después de traducir
+            ai_response = restore_product_names(translated_response, protected_names)
+
+        print(f"📩 Respuesta de la IA (final después de traducir y restaurar nombres): {ai_response}", flush=True)
 
         # 💾 Guardar SIEMPRE el mensaje de la IA
         ChatMessage.objects.create(

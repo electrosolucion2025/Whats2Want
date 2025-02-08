@@ -1,11 +1,12 @@
-from datetime import datetime
 import unicodedata
 import uuid
 
+from datetime import datetime
 from django.conf import settings
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.orders.models import Order, OrderItem
@@ -81,6 +82,14 @@ def redsys_notify(request):
             order.payment_status = "PAID"
             order.status = "COMPLETED"
             order.save()
+            
+                # 🚪 **Cerrar la sesión del usuario**
+            chat_session = order.chat_session  # Asegurarnos de que el pedido tiene una sesión activa
+            if chat_session:
+                chat_session.is_active = False  # Marcar la sesión como cerrada
+                chat_session.ended_at = timezone.now()  # Guardar la hora de cierre
+                chat_session.save()
+                print(f"🔒 Sesión {chat_session.id} cerrada tras el pago del pedido {order.order_number}", flush=True)
             
             # 🖨️ **Generar los tickets de impresión**
             process_successful_payment(order)
