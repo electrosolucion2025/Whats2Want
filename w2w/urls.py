@@ -24,6 +24,7 @@ urlpatterns = [
     path('whatsapp/', include('apps.whatsapp.urls')),
     path('payments/', include('apps.payments.urls')),
     path('printers/', include('apps.printers.urls')),
+    path("admin/assistant/", include("apps.assistant.urls")),
 ]
 
 # Ruta para cambiar idioma
