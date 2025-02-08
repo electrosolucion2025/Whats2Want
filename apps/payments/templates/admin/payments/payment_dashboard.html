@@ -1,0 +1,37 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <div class="app-payment module">
+    <h2>📊 Dashboard de Pagos</h2>
+    <p>Resumen de pagos y estadísticas generales.</p>
+
+    <table class="stats-table">
+      <tr>
+        <th>Total Pagos</th>
+        <td>{{ total_payments }} €</td>
+      </tr>
+      <tr>
+        <th>Pagos Completados</th>
+        <td>{{ completed_payments }}</td>
+      </tr>
+      <tr>
+        <th>Pagos Pendientes</th>
+        <td>{{ pending_payments }}</td>
+      </tr>
+      <tr>
+        <th>Pagos Reembolsados</th>
+        <td>{{ refunded_payments }}</td>
+      </tr>
+    </table>
+
+    <h3>💰 Ingresos por Tenant</h3>
+    <ul>
+      {% for item in payments_by_tenant %}
+        <li>{{ item.tenant__name }}: {{ item.total }} € ({{ item.count }} pagos)</li>
+      {% endfor %}
+    </ul>
+
+    <br>
+    <a href="{% url 'admin:payments_payment_changelist' %}" class="button">⬅️ Volver</a>
+  </div>
+{% endblock %}
