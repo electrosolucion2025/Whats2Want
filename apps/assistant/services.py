@@ -30,8 +30,13 @@ def remove_json_blocks(text):
     return text
 
 
-def generate_openai_response(message, session):
-    user_message = message.get('text', {}).get('body')
+def generate_openai_response(message, session, transcribed_text=None):
+    # 📌 Determinar el contenido del mensaje
+    user_message = transcribed_text if transcribed_text else message.get('text', {}).get('body')
+
+    if not user_message:
+        return "No se recibió ningún contenido válido para procesar."
+    
     base_prompt = TenantPrompt.objects.filter(tenant=session.tenant, is_active=True).first()
 
     prompt_content = base_prompt.content if base_prompt else get_base_prompt()

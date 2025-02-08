@@ -60,8 +60,20 @@ def manage_chat_session(tenant, phone_number, message_content):
 
 
 # ✅ 2️⃣ Procesamiento del mensaje de WhatsApp
-def process_whatsapp_message(message, contact, tenant):
-    message_content = message.get('text', {}).get('body')
+def process_whatsapp_message(message, contact, tenant, transcribed_text=None):
+    """
+    Procesa el mensaje de WhatsApp para gestionar la sesión de chat y la IA.
+    Si es un audio, usa `transcribed_text` como el contenido del mensaje.
+    """
+    # Determinar el contenido del mensaje
+    if transcribed_text:  # Si es un audio transcrito, usarlo
+        message_content = transcribed_text
+    else:
+        message_content = message.get("text", {}).get("body")
+
+    if not message_content:
+        return None  # Evita procesar mensajes vacíos o sin contenido útil
+
     phone_number = contact.phone_number
 
     # Obtener o crear la sesión de chat
@@ -71,23 +83,22 @@ def process_whatsapp_message(message, contact, tenant):
     assistant_session, _ = AssistantSession.objects.get_or_create(
         chat_session=chat_session,
         defaults={
-            'tenant': tenant,
-            'phone_number': phone_number,
-            'is_active': True,
-            'start_time': now()
-        }
+            "tenant": tenant,
+            "phone_number": phone_number,
+            "is_active": True,
+            "start_time": now(),
+        },
     )
 
     # Guardar el mensaje del usuario en la sesión de IA
     AIMessage.objects.create(
         tenant=tenant,
         session=assistant_session,
-        role='user',
-        content=message_content
+        role="user",
+        content=message_content,  # Guardamos el texto transcrito o el mensaje normal
     )
 
     return assistant_session
-
 
 # ✅ 3️⃣ Cierre de sesiones de Chat y Asistente
 def close_chat_and_assistant_session(chat_session):
