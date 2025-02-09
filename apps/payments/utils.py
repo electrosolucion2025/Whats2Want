@@ -55,7 +55,7 @@ def send_order_email(order):
     # 🔹 Iterar sobre los productos en el pedido
     for item in order.items.all():
         extras = ', '.join([extra['name'] for extra in item.extras]) if isinstance(item.extras, list) and item.extras else "Sin extras"
-        excluded = ', '.join(item.exclusions) if isinstance(item.exclusions, list) and item.exclusions else "Sin exclusiones"
+        excluded = ', '.join(item.exclusions) if isinstance(item.exclusions, list) else (item.exclusions if item.exclusions else "Sin exclusiones")
         special_instructions = f"<br><small style='color: #0066cc;'>📝 {item.special_instructions}</small>" if item.special_instructions else ""
 
         body += f"""

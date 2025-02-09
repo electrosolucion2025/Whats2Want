@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework.authtoken',
     'core',
     'apps.menu',
     'apps.orders',
@@ -54,8 +56,19 @@ INSTALLED_APPS = [
     'apps.assistant',
     'apps.payments',
     'apps.printers',
-    'apps.tenants'
+    'apps.tenants',
+    'corsheaders',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',  # Usa tokens en cada request
+        'rest_framework.authentication.SessionAuthentication',  # Para acceso desde el admin
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',  # Bloquea acceso anónimo por defecto
+    ],
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -66,6 +79,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.locale.LocaleMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'w2w.urls'
@@ -133,6 +147,24 @@ REDSYS = {
     "URL_KO": os.getenv("REDSYS_URL_KO", default="https://tudominio.com/payments/failure/"),
 }
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost',   # Permitir desde localhost
+    'http://127.0.0.1',   # Permitir acceso local
+    # 'http://tu-dominio.com',  # Permitir desde un dominio real (cuando despliegues)
+    # 'https://tu-dominio.com',
+    'https://2325-88-24-61-206.ngrok-free.app'
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Si usas React en desarrollo
+    "http://127.0.0.1:8000",  # Backend local
+    "https://tu-dominio.com",  # Dominio en producción
+]
+
+
+CSRF_COOKIE_SECURE = False  # No requiere HTTPS en desarrollo
+CSRF_COOKIE_HTTPONLY = False  # Permitir acceso desde el frontend
+CSRF_USE_SESSIONS = True  # Asocia el CSRF a la sesión del usuario
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/

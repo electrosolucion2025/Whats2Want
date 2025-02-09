@@ -1,12 +1,18 @@
-from django.http import JsonResponse
-from django.views import View
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
 import json
-from apps.tenants.models import Tenant
-from .models import Category, Product, Extra, Allergen, ProductAllergen, ExtraAllergen, ProductExtra
 
-@method_decorator(csrf_exempt, name='dispatch')
+from django.http import JsonResponse
+from django.utils.decorators import method_decorator
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import permission_classes
+from rest_framework.permissions import IsAuthenticated
+
+from .models import Category, Product, Extra, Allergen, ProductAllergen, ExtraAllergen, ProductExtra
+from apps.tenants.models import Tenant
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+@method_decorator(permission_classes([IsAuthenticated]), name="dispatch")  # 🔒 Solo autenticados
 class MenuUploadView(View):
     def post(self, request, *args, **kwargs):
         try:
