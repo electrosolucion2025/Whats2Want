@@ -12,6 +12,30 @@ from apps.chat.services import process_whatsapp_message
 from apps.whatsapp.utils import download_whatsapp_media, send_whatsapp_message, transcribe_audio
 
 def process_webhook_event(data):
+    # 🔹 Validar que "entry" existe y no está vacío
+    entry_list = data.get("entry", [])
+    if not entry_list:
+        print("❌ Error: 'entry' no encontrado en el JSON o está vacío", flush=True)
+        return
+
+    # 🔹 Validar que "changes" existe y no está vacío
+    changes_list = entry_list[0].get("changes", [])
+    if not changes_list:
+        print("❌ Error: 'changes' no encontrado en el JSON o está vacío", flush=True)
+        return
+
+    # 🔹 Validar que "value" existe en "changes"
+    value_data = changes_list[0].get("value", {})
+    if not value_data:
+        print("❌ Error: 'value' no encontrado en 'changes'", flush=True)
+        return
+
+    # 🔹 Validar que "metadata" existe en "value"
+    metadata = value_data.get("metadata", {})
+    if not metadata:
+        print("❌ Error: 'metadata' no encontrado en 'value'", flush=True)
+        return
+    
     # 1️⃣ Obtener el número de teléfono receptor del webhook
     business_phone_number = data.get('entry', [])[0].get('changes', [])[0].get('value', {}).get('metadata', {}).get('display_phone_number')
     
