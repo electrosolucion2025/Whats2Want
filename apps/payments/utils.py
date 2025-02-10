@@ -7,7 +7,7 @@ def send_order_email(order):
     """ Envía un correo con el ticket del pedido usando SendGrid """
     # 📩 Configuración del email
     subject = f"✅ Confirmación de tu pedido #{order.order_number}"
-    # to_email = "juanmacostapts@gmail.com"  # 📌 Si tienes el email real del cliente, úsalo aquí
+    to_email = order.tenant.email  # 📌 Usando el email del tenant
     from_email = settings.SENDGRID_FROM_EMAIL  # 📩 Remitente del correo
 
     # ✨ Contenido del correo
@@ -97,11 +97,7 @@ def send_order_email(order):
     # 📧 Crear el mensaje
     message = Mail(
         from_email=from_email,
-        to_emails= [
-            "juanmacostapts@gmail.com",
-            "p166r@yahoo.es"
-        ],
-        # to_emails=to_email,
+        to_emails=to_email,
         subject=subject,
         html_content=body
     )
