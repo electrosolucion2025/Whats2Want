@@ -151,19 +151,18 @@ REDSYS = {
     "URL_KO": os.getenv("REDSYS_URL_KO", default="https://tudominio.com/payments/failure/"),
 }
 
-# CSRF_TRUSTED_ORIGINS = [
-#     'http://localhost',   # Permitir desde localhost
-#     'http://127.0.0.1',   # Permitir acceso local
-#     # 'http://tu-dominio.com',  # Permitir desde un dominio real (cuando despliegues)
-#     # 'https://tu-dominio.com',
-#     'https://6340-88-24-61-206.ngrok-free.app'
-# ]
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost',   # Permitir desde localhost
+    'http://127.0.0.1',   # Permitir acceso local
+    'http://whats2want.up.railway.app/',  # Permitir desde un dominio real (cuando despliegues)
+    'https://whats2want.up.railway.app/',
+]
 
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:3000",  # Si usas React en desarrollo
-#     "http://127.0.0.1:8000",  # Backend local
-#     "https://tu-dominio.com",  # Dominio en producción
-# ]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Si usas React en desarrollo
+    "http://127.0.0.1:8000",  # Backend local
+    "https://whats2want.up.railway.app/",  # Dominio en producción
+]
 
 
 # CSRF_COOKIE_SECURE = False  # No requiere HTTPS en desarrollo
@@ -191,7 +190,15 @@ LOCALE_PATHS = [
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+# 📌 Indica el directorio donde se recopilarán los archivos estáticos
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# 📌 Directorios adicionales donde Django buscará archivos estáticos
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static')
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
