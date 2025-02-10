@@ -101,7 +101,7 @@ class CategoryAdmin(admin.ModelAdmin):
                     # 🔹 Simula una petición POST al endpoint de `MenuUploadView`
                     client = Client()
                     response = client.post(
-                        reverse("upload-menu"),  # Asegúrate de que este nombre coincide con tu URL
+                        reverse("upload_menu"),  # Asegúrate de que este nombre coincide con tu URL
                         data=json.dumps(data),
                         content_type="application/json",
                     )
