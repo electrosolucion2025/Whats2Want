@@ -5,6 +5,8 @@ from django.shortcuts import render, redirect
 from django.urls import path
 from django import forms
 from django.utils.html import format_html
+from django.urls import reverse
+from django.test import Client
 
 from apps.menu.models import (
     Product, Category, Allergen, Extra, ProductAllergen, ProductExtra, ExtraAllergen
@@ -81,10 +83,10 @@ class CategoryAdmin(admin.ModelAdmin):
         extra_context["import_menu_url"] = "/admin/menu/category/import-menu/"  # ✅ URL Absoluta Correcta
         return super().changelist_view(request, extra_context=extra_context)
 
-
     def import_menu_view(self, request):
         """
         Vista personalizada para importar menús desde un archivo JSON.
+        Ahora redirige los datos al endpoint de `MenuUploadView` y le agrega `tenant_id`.
         """
         if request.method == "POST":
             form = MenuUploadForm(request.POST, request.FILES)
@@ -94,42 +96,81 @@ class CategoryAdmin(admin.ModelAdmin):
 
                 try:
                     data = json.load(json_file)
-                    self.process_menu_upload(data, tenant)
-                    messages.success(request, f"✅ Menú importado exitosamente para {tenant.name}.")
+                    data["tenant_id"] = str(tenant.id)  # 🔹 Agregamos manualmente `tenant_id`
+
+                    # 🔹 Simula una petición POST al endpoint de `MenuUploadView`
+                    client = Client()
+                    response = client.post(
+                        reverse("upload-menu"),  # Asegúrate de que este nombre coincide con tu URL
+                        data=json.dumps(data),
+                        content_type="application/json",
+                    )
+
+                    # 🔹 Manejo de la respuesta
+                    if response.status_code == 201:
+                        messages.success(request, f"✅ Menú importado exitosamente para {tenant.name}.")
+                    else:
+                        messages.error(request, f"❌ Error en la importación: {response.json().get('error', 'Desconocido')}")
+
                     return redirect("admin:menu_category_changelist")
+
                 except Exception as e:
                     messages.error(request, f"❌ Error al procesar el archivo JSON: {e}")
+
         else:
             form = MenuUploadForm()
 
-        context = {
-            "form": form,
-            "title": "Importar Menú desde JSON"
-        }
+        context = {"form": form, "title": "Importar Menú desde JSON"}
         return render(request, "admin/import_menu.html", context)
 
-    def process_menu_upload(self, data, tenant):
-        """
-        Procesa el archivo JSON y carga el menú en la base de datos.
-        """
-        for category_data in data.get("categories", []):
-            category, _ = Category.objects.get_or_create(
-                name=category_data["name"],
-                tenant=tenant
-            )
+    # def import_menu_view(self, request):
+    #     """
+    #     Vista personalizada para importar menús desde un archivo JSON.
+    #     """
+    #     if request.method == "POST":
+    #         form = MenuUploadForm(request.POST, request.FILES)
+    #         if form.is_valid():
+    #             tenant = form.cleaned_data["tenant"]
+    #             json_file = request.FILES["json_file"]
 
-            for item in category_data.get("items", []):
-                product, _ = Product.objects.get_or_create(
-                    name=item["name"],
-                    tenant=tenant,
-                    defaults={
-                        "category": category,
-                        "description": item.get("description", ""),
-                        "ingredients": ", ".join(item.get("ingredients", [])),
-                        "price": item.get("price", 0),
-                        "available": item.get("available", True)
-                    }
-                )
+    #             try:
+    #                 data = json.load(json_file)
+    #                 self.process_menu_upload(data, tenant)
+    #                 messages.success(request, f"✅ Menú importado exitosamente para {tenant.name}.")
+    #                 return redirect("admin:menu_category_changelist")
+    #             except Exception as e:
+    #                 messages.error(request, f"❌ Error al procesar el archivo JSON: {e}")
+    #     else:
+    #         form = MenuUploadForm()
+
+    #     context = {
+    #         "form": form,
+    #         "title": "Importar Menú desde JSON"
+    #     }
+    #     return render(request, "admin/import_menu.html", context)
+
+    # def process_menu_upload(self, data, tenant):
+    #     """
+    #     Procesa el archivo JSON y carga el menú en la base de datos.
+    #     """
+    #     for category_data in data.get("categories", []):
+    #         category, _ = Category.objects.get_or_create(
+    #             name=category_data["name"],
+    #             tenant=tenant
+    #         )
+
+    #         for item in category_data.get("items", []):
+    #             product, _ = Product.objects.get_or_create(
+    #                 name=item["name"],
+    #                 tenant=tenant,
+    #                 defaults={
+    #                     "category": category,
+    #                     "description": item.get("description", ""),
+    #                     "ingredients": ", ".join(item.get("ingredients", [])),
+    #                     "price": item.get("price", 0),
+    #                     "available": item.get("available", True)
+    #                 }
+    #             )
                 
     def import_menu_button(self):
         """
