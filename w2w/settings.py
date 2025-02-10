@@ -154,20 +154,20 @@ REDSYS = {
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost',   # Permitir desde localhost
     'http://127.0.0.1',   # Permitir acceso local
-    'http://whats2want.up.railway.app/',  # Permitir desde un dominio real (cuando despliegues)
-    'https://whats2want.up.railway.app/',
+    'http://whats2want.up.railway.app',  # Permitir desde un dominio real (cuando despliegues)
+    'https://whats2want.up.railway.app',
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Si usas React en desarrollo
     "http://127.0.0.1:8000",  # Backend local
-    "https://whats2want.up.railway.app/",  # Dominio en producción
+    "https://whats2want.up.railway.app",  # Dominio en producción
 ]
 
 
-# CSRF_COOKIE_SECURE = False  # No requiere HTTPS en desarrollo
-# CSRF_COOKIE_HTTPONLY = False  # Permitir acceso desde el frontend
-# CSRF_USE_SESSIONS = True  # Asocia el CSRF a la sesión del usuario
+CSRF_COOKIE_SECURE = True  # No requiere HTTPS en desarrollo
+CSRF_COOKIE_HTTPONLY = True  # Permitir acceso desde el frontend
+CSRF_USE_SESSIONS = True  # Asocia el CSRF a la sesión del usuario
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
