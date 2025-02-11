@@ -56,7 +56,6 @@ venv/
 ENV/
 
 # Migrations
-**/migrations/
 *.pot
 *.pyc
 
