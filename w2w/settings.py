@@ -159,12 +159,14 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',   # Permitir acceso local
     'http://whats2want.up.railway.app',  # Permitir desde un dominio real (cuando despliegues)
     'https://whats2want.up.railway.app',
+    'https://3d07-88-24-61-206.ngrok-free.app',
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Si usas React en desarrollo
     "http://127.0.0.1:8000",  # Backend local
     "https://whats2want.up.railway.app",  # Dominio en producción
+    "https://3d07-88-24-61-206.ngrok-free.app",
 ]
 
 
