@@ -38,6 +38,7 @@ class Category(models.Model):
     image = models.ImageField(upload_to='categories/', blank=True, null=True, verbose_name="Imagen")
     order = models.PositiveIntegerField(default=0, verbose_name="Orden de aparición")
     is_active = models.BooleanField(default=True, verbose_name="¿Activo?")
+    print_zones = models.ManyToManyField('printers.PrinterZone', blank=True, verbose_name="Zonas de impresión")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Última actualización")
 

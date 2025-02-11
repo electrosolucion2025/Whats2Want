@@ -200,11 +200,17 @@ def process_successful_payment(order):
     """
     print(f"✅ Generando tickets de impresión para el pedido {order.order_number}")
 
-    # Obtener las zonas de impresión únicas para los productos del pedido
+    # Obtener las zonas de impresión únicas considerando primero la categoría, luego el producto
     printer_zones = set()
     for item in order.items.all():
-        printer_zones.update(item.product.print_zones.all())  # M2M relation
+        product = item.product
 
+        # Si la categoría tiene zona de impresión, usar esa; de lo contrario, usar la del producto
+        if product.category and product.category.print_zones.exists():
+            printer_zones.update(product.category.print_zones.all())
+        elif product.print_zones.exists():
+            printer_zones.update(product.print_zones.all())
+            
     # Crear un ticket de impresión para cada zona
     tickets = []
     for zone in printer_zones:
