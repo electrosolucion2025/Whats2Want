@@ -73,6 +73,7 @@ class WhatsAppContact(models.Model):
     profile_picture_url = models.URLField(blank=True, null=True, verbose_name="Foto de Perfil")
     wa_id = models.CharField(max_length=50, unique=True, verbose_name="ID de WhatsApp")
     last_interaction = models.DateTimeField(auto_now=True, verbose_name="Última Interacción")
+    last_policy_sent = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Contacto de WhatsApp"

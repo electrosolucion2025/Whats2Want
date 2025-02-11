@@ -27,7 +27,7 @@ def get_menu_data(tenant):
                 "description": product.description,
                 "price": product.price,
                 "available": product.available,
-                "extras": [{"name": extra.name, "price": extra.price} for extra in extras],
+                "extras": [{"name": extra.name, "price": extra.price, "available": extra.available} for extra in extras],
                 "allergens": [allergen.name for allergen in allergens]
             }
             
