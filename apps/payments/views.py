@@ -330,28 +330,3 @@ def clean_text(text):
         text = text.replace(emoji, replacement)
 
     return text
-
-# def generate_ticket_content(order, printer_zone):
-#     """
-#     Genera el contenido del ticket según la zona de impresión.
-#     """
-#     ticket_lines = [f"Pedido #{order.order_number}", "-" * 30]
-
-#     for item in order.items.all():
-#         if printer_zone in item.product.print_zones.all():
-#             ticket_lines.append(f"{item.quantity}x {item.product.name}")
-
-#             # Extras
-#             if item.extras:
-#                 ticket_lines.append(f"  + Extras: {', '.join([extra['name'] for extra in item.extras])}")
-
-#             # Exclusiones
-#             if item.exclusions:
-#                 ticket_lines.append(f"  - Sin: {', '.join(item.exclusions)}")
-
-#             # Instrucciones especiales
-#             if item.special_instructions:
-#                 ticket_lines.append(f"  ! {item.special_instructions}")
-
-#     ticket_lines.append("-" * 30)
-#     return "\n".join(ticket_lines)

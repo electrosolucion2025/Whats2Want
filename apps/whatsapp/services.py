@@ -92,7 +92,7 @@ def process_webhook_event(data):
                         assistant_session = process_whatsapp_message(message, whatsapp_contact, tenant, transcribed_text=transcribed_text)
                         
                         # 🚀 Generar la respuesta de OpenAI
-                        ai_response = generate_openai_response(message, assistant_session, transcribed_text=transcribed_text)
+                        ai_response = generate_openai_response(message, assistant_session, whatsapp_contact, transcribed_text=transcribed_text)
                         
                         # 🚀 Enviar la respuesta a WhatsApp
                         send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)

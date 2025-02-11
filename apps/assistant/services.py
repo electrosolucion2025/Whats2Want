@@ -1,14 +1,19 @@
+# Python standard library imports
 import json
-import openai
 import re
 import uuid
 
+# Third party imports
+import openai
 from django.conf import settings
-from apps.orders.services import save_order_to_db
+from django.utils.timezone import now
+
+# Local application imports
 from .prompt import get_base_prompt
 from apps.assistant.models import AIMessage, OpenAIRequestLog
 from apps.chat.models import ChatMessage
 from apps.menu.services import get_menu_data
+from apps.orders.services import save_order_to_db
 from apps.tenants.models import TenantPrompt
 
 openai.api_key = settings.OPENAI_API_KEY
@@ -77,7 +82,7 @@ def restore_product_names(text, protected_names):
         text = text.replace(placeholder, product)
     return text
 
-def generate_openai_response(message, session, transcribed_text=None):
+def generate_openai_response(message, session, contact, transcribed_text=None):
     """Genera una respuesta de OpenAI asegurando que sea en el idioma del usuario"""
 
     # 📌 Obtener el mensaje del usuario
@@ -100,6 +105,15 @@ def generate_openai_response(message, session, transcribed_text=None):
     base_prompt = TenantPrompt.objects.filter(tenant=session.tenant, is_active=True).first()
     prompt_content = base_prompt.content if base_prompt else get_base_prompt()
 
+    # 📋 Verificar si se deben incluir las políticas
+    include_policies = should_include_policies(contact)
+    
+    if not include_policies:
+        prompt_content = prompt_content.replace(
+            "Di el mensaje con la politica de privacidad (Si lo tienes que decir, dilo siempre al principio, en el primer mensaje, junto con el saludo)",
+            "Evita decir las politicas. Este usuario ya las aceptó."
+        )
+    
     # 📋 Obtener el menú del tenant
     menu_data = get_menu_data(session.tenant)
 
@@ -238,3 +252,16 @@ def extract_order_json(context_messages, session):
             except json.JSONDecodeError as e:
                 print(f"❌ Error al decodificar JSON: {e}", flush=True)
             break
+
+def should_include_policies(contact):
+    """ 
+    Verifica si se deben incluir las políticas en la respuesta y, si es así, 
+    actualiza la fecha en la base de datos.
+    """
+    if not contact.last_policy_sent or (now() - contact.last_policy_sent).days >= 30: 
+        # 💾 Guardar la fecha de envío de las políticas
+        contact.last_policy_sent = now()
+        contact.save(update_fields=['last_policy_sent'])    
+        return True  # Se incluyen las políticas
+
+    return False  # No se incluyen las políticas
