@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'apps.payments',
     'apps.printers',
     'apps.tenants',
+    'apps.promotions',
     'corsheaders',
 ]
 

@@ -154,10 +154,10 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
         response = openai.chat.completions.create(**payload)
         ai_response = response.choices[0].message.content
         print(f"📩 Respuesta de la IA (antes de limpiar JSON): {ai_response}", flush=True)
-
+        
         # ❌ Eliminar bloques JSON de la respuesta
         ai_response = remove_json_blocks(ai_response)
-
+        
         # 🔍 Detectar el idioma de la respuesta de OpenAI
         response_language = detect_language_openai(ai_response).lower()
         print(f"🔍 Idioma detectado en respuesta de OpenAI: {response_language}", flush=True)
@@ -191,7 +191,7 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
             role='assistant',
             content=ai_response
         )
-
+        
         # ✅ Verificar si hay un bloque JSON para la finalización del pedido
         if 'order_finalized' in response.choices[0].message.content:
             print("✅ Pedido finalizado detectado, procesando JSON...", flush=True)
