@@ -1,10 +1,13 @@
+# Python standard library imports
 import uuid
 from decimal import Decimal
 
+# Django imports
+from apps.menu.models import Extra, Product
 from apps.orders.models import Order, OrderItem
-from apps.menu.models import Product, Extra
 from apps.payments.models import Payment
 from apps.payments.services import generate_payment_link
+from apps.whatsapp.models import WhatsAppContact
 from apps.whatsapp.utils import send_whatsapp_message
 
 def generate_order_number():
@@ -61,13 +64,23 @@ def save_order_to_db(order_data, session):
                 except Extra.DoesNotExist:
                     print(f"❌ Extra no encontrado: {extra_name}", flush=True)
                     continue
+            
+            # 🚀 Obtener el contacto del usuario para verificar si es su primera compra
+            contact = WhatsAppContact.objects.filter(phone_number=session.phone_number, tenant=session.tenant).first()
+            is_first_buy = contact.first_buy if contact else False
+
+            # ✅ Solo permitir precio 0 si es la primera compra y el producto es café
+            if is_first_buy:
+                print(f"🎁 Aplicando promoción de café gratis para {contact.phone_number}", flush=True)
+            else:
+                unit_price = product.price  # ❌ Si no es la primera compra, usar el precio de la BD
 
             order_item = OrderItem.objects.create(
                 tenant=session.tenant,
                 order=order,
                 product=product,
                 quantity=quantity,
-                price=unit_price or product.price,
+                price=unit_price,
                 exclusions=", ".join(exclusions),
                 special_instructions=special_instructions,
                 extras=extras_list,
@@ -75,12 +88,20 @@ def save_order_to_db(order_data, session):
                 tax_amount=item_tax
             )
 
-            total_price += order_item.final_price
+            # ✅ Si el producto no es gratuito, sumarlo al total
+            if order_item.price > 0:
+                total_price += order_item.final_price
 
         order.total_price = Decimal(total_price - order.discount + order.tax_amount).quantize(Decimal("0.01"))
         order.save()
 
         print("✅ Pedido guardado correctamente en la base de datos.", flush=True)
+        
+        contact = WhatsAppContact.objects.get(phone_number=session.phone_number, tenant=session.tenant)
+        if contact and contact.first_buy:
+            contact.first_buy = False
+            contact.save()
+            print(f"🎉 Primera compra registrada para {contact.phone_number}. `first_buy` actualizado a False.", flush=True)
         
         # 🏦 **Crear registro del pago**
         payment = Payment.objects.create(

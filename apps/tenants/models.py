@@ -75,6 +75,7 @@ class Tenant(models.Model):
         verbose_name="Currency"
     )  # 🟡 Optional, but with predefined values
     is_active = models.BooleanField(default=True, verbose_name="Active?")  # 🟡 Optional
+    has_first_buy_promo = models.BooleanField(default=False, verbose_name="Promoción de primera compra activa")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creation Date")  # 🟢 Auto
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Last Updated")  # 🟢 Auto
 

@@ -13,8 +13,10 @@ from .prompt import get_base_prompt
 from apps.assistant.models import AIMessage, OpenAIRequestLog
 from apps.chat.models import ChatMessage
 from apps.menu.services import get_menu_data
+from apps.orders.models import Order
 from apps.orders.services import save_order_to_db
 from apps.tenants.models import TenantPrompt
+
 
 openai.api_key = settings.OPENAI_API_KEY
 
@@ -111,8 +113,22 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
     if not include_policies:
         prompt_content = prompt_content.replace(
             "Di el mensaje con la politica de privacidad (Si lo tienes que decir, dilo siempre al principio, en el primer mensaje, junto con el saludo)",
-            "Evita decir las politicas. Este usuario ya las aceptó."
+            "Evita decir las politicas a no ser que te pregunten por ellas. Este usuario ya las aceptó."
         )
+    
+    if contact.first_buy:
+        print("🎁 Este es el primer pedido del usuario. Añadiendo mensaje de promoción al prompt.", flush=True)
+        
+        # prompt_content += (
+        #     "\n\n🚀 **PROMOCIÓN ACTIVA**: Este cliente tiene un café gratis a elegir entre los 3 cafés mas baratos que tengas. "
+        #     "Fuera de esos, cóbralos todos en su primera compra, siempre que haya comprado al menos un producto aparte del café. "
+        #     "Antes de finalizar el pedido, asegúrate de que el precio de uno de los cafés sea 0. Si el cliente pide varios cafés, "
+        #     "asegúrate de que el precio de uno de los cafés sea 0. Siempre pon a 0 el café más barato. Si el cliente no pide café, "
+        #     "recuerda decirle que puede pedir uno gratis si compra al menos un producto adicional. Para el café gratis en el JSON, "
+        #     "modifica el `unit_price` a 0."
+        # )
+        
+        prompt_content += "**PROMOCIÓN ACTIVA**: !Este cliente tiene un café gratis por su primera compra a elegir entre café espresso, cafe con leche y cafe cortado.¡ Si ha pedido un café, dile que es de regalo y pon su 'unit_price': 0 en el JSON, no modifiques otro valor. Para que esta promocion sea valida, el cliente debe haber pedido al menos un producto aparte del café. Si el cliente no ha pedido un café, antes de terminar el pedido, recuerdale la promoción y dile que puede elegir un café gratis si compra al menos un producto adicional."
     
     # 📋 Obtener el menú del tenant
     menu_data = get_menu_data(session.tenant)
@@ -154,10 +170,10 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
         response = openai.chat.completions.create(**payload)
         ai_response = response.choices[0].message.content
         print(f"📩 Respuesta de la IA (antes de limpiar JSON): {ai_response}", flush=True)
-
+        
         # ❌ Eliminar bloques JSON de la respuesta
         ai_response = remove_json_blocks(ai_response)
-
+        
         # 🔍 Detectar el idioma de la respuesta de OpenAI
         response_language = detect_language_openai(ai_response).lower()
         print(f"🔍 Idioma detectado en respuesta de OpenAI: {response_language}", flush=True)
@@ -191,7 +207,7 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
             role='assistant',
             content=ai_response
         )
-
+        
         # ✅ Verificar si hay un bloque JSON para la finalización del pedido
         if 'order_finalized' in response.choices[0].message.content:
             print("✅ Pedido finalizado detectado, procesando JSON...", flush=True)
