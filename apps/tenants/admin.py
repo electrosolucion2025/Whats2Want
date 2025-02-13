@@ -13,11 +13,11 @@ from apps.whatsapp.models import WhatsAppContact
 
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
-    list_display = ("name", "nif", "phone_number", "phone_number_id", "is_active")
-    search_fields = ("name", "nif", "phone_number", "phone_number_id")  # ✅ Búsqueda rápida
-    list_filter = ("is_active", "created_at")  # ✅ Filtro por estado activo/inactivo
-    ordering = ("-created_at",)  # ✅ Orden descendente (más recientes primero)
-    actions = ["toggle_active_status", "export_as_csv", "export_as_json"]  # ✅ Acciones personalizadas
+    list_display = ("name", "nif", "phone_number", "phone_number_id", "is_active", "has_first_buy_promo")  # ✅ Añadido
+    search_fields = ("name", "nif", "phone_number", "phone_number_id")
+    list_filter = ("is_active", "has_first_buy_promo", "created_at")  # ✅ Filtrado rápido
+    ordering = ("-created_at",)
+    actions = ["toggle_active_status", "toggle_first_buy_promo", "export_as_csv", "export_as_json"]  # ✅ Añadida acción
     
     def save_model(self, request, obj, form, change):
         """
@@ -132,11 +132,23 @@ class TenantAdmin(admin.ModelAdmin):
         return "0.00 €"
     average_revenue_per_order.short_description = "Ingreso Medio/Pedido"
     
-     # 🔹 Mostrar en la vista de detalle
+    # ✅ Acción para activar/desactivar la promoción de primera compra
+    def toggle_first_buy_promo(self, request, queryset):
+        """
+        Activa o desactiva la promoción de primera compra para los Tenants seleccionados.
+        """
+        for tenant in queryset:
+            tenant.has_first_buy_promo = not tenant.has_first_buy_promo  # Cambia el estado
+            tenant.save()
+        self.message_user(request, "Estado de la promoción actualizado correctamente.")
+
+    toggle_first_buy_promo.short_description = "🎁 Activar/Desactivar Promoción de Primera Compra"
+    
+    # 🔹 Mostrar en la vista de detalle
     fieldsets = (
         ("Información Básica", {"fields": ("name", "owner_name", "phone_number", "phone_number_id", "whatsapp_access_token")}),
         ("Detalles de Negocio", {"fields": ("email", "address", "nif", "timezone", "currency")}),
-        ("Estado", {"fields": ("is_active",)}),
+        ("Configuraciones", {"fields": ("is_active", "has_first_buy_promo")}),  # ✅ Campo visible en el formulario
         ("Más Información", {
             "fields": (
                 "total_orders",

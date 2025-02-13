@@ -66,21 +66,22 @@ class WebhookEvent(models.Model):
 
 # 📌 **Modelo de Contactos de WhatsApp**
 class WhatsAppContact(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name="ID")
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, verbose_name="Tenant")
-    phone_number = models.CharField(max_length=20, unique=True, verbose_name="Número de Teléfono")
-    name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Nombre")
-    profile_picture_url = models.URLField(blank=True, null=True, verbose_name="Foto de Perfil")
-    wa_id = models.CharField(max_length=50, unique=True, verbose_name="ID de WhatsApp")
-    last_interaction = models.DateTimeField(auto_now=True, verbose_name="Última Interacción")
-    last_policy_sent = models.DateTimeField(null=True, blank=True)
+    phone_number = models.CharField(max_length=20, unique=True, verbose_name="Phone Number")
+    name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Name")
+    profile_picture_url = models.URLField(blank=True, null=True, verbose_name="Profile Picture URL")
+    wa_id = models.CharField(max_length=50, unique=True, verbose_name="WhatsApp ID")
+    last_interaction = models.DateTimeField(auto_now=True, verbose_name="Last Interaction")
+    last_policy_sent = models.DateTimeField(null=True, blank=True, verbose_name="Last Policy Sent")
+    first_buy = models.BooleanField(default=True, verbose_name="First Buy")
 
     class Meta:
-        verbose_name = "Contacto de WhatsApp"
-        verbose_name_plural = "Contactos de WhatsApp"
+        verbose_name = "WhatsApp Contact"
+        verbose_name_plural = "WhatsApp Contacts"
 
     def __str__(self):
-        return self.phone_number
+        return f"{self.name or 'Unknown'} - {self.phone_number}"
 
 # 📌 **Modelo de Estado de Mensajes**
 class MessageStatus(models.Model):
