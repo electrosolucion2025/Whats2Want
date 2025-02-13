@@ -167,7 +167,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://whats2want.up.railway.app",  # Dominio en producción
 ]
 
-
 CSRF_COOKIE_SECURE = True  # No requiere HTTPS en desarrollo
 CSRF_COOKIE_HTTPONLY = True  # Permitir acceso desde el frontend
 CSRF_USE_SESSIONS = True  # Asocia el CSRF a la sesión del usuario

@@ -56,14 +56,14 @@ def save_order_to_db(order_data, session):
             extras_list = []
             for extra_data in extras_data:
                 extra_name = extra_data.get('name')
-                extra_price = Decimal(str(extra_data.get('price', 0.00)))  
+                extra_price = Decimal(str(extra_data.get('price', 0.00)))
 
-                try:
-                    extra = Extra.objects.get(name__iexact=extra_name, tenant=session.tenant)
+                extra = Extra.objects.filter(name__iexact=extra_name, tenant=session.tenant).first()
+                
+                if extra:
                     extras_list.append({"name": extra.name, "price": float(extra_price)})
-                except Extra.DoesNotExist:
+                else:
                     print(f"❌ Extra no encontrado: {extra_name}", flush=True)
-                    continue
             
             # 🚀 Obtener el contacto del usuario para verificar si es su primera compra
             contact = WhatsAppContact.objects.filter(phone_number=session.phone_number, tenant=session.tenant).first()

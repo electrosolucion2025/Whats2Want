@@ -60,10 +60,11 @@ class ProductAdmin(admin.ModelAdmin):
 # 📌 **Admin de Categorías con Importación de Menú**
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "tenant", "is_active", "created_at")
+    list_display = ("name", "tenant", "order", "is_active", "created_at")
     list_filter = ("tenant", "is_active", "created_at")
+    list_editable = ("order",)
     search_fields = ("name",)
-    ordering = ("-created_at",)
+    ordering = ("order",)
 
     def get_urls(self):
         """
@@ -123,55 +124,6 @@ class CategoryAdmin(admin.ModelAdmin):
         context = {"form": form, "title": "Importar Menú desde JSON"}
         return render(request, "admin/import_menu.html", context)
 
-    # def import_menu_view(self, request):
-    #     """
-    #     Vista personalizada para importar menús desde un archivo JSON.
-    #     """
-    #     if request.method == "POST":
-    #         form = MenuUploadForm(request.POST, request.FILES)
-    #         if form.is_valid():
-    #             tenant = form.cleaned_data["tenant"]
-    #             json_file = request.FILES["json_file"]
-
-    #             try:
-    #                 data = json.load(json_file)
-    #                 self.process_menu_upload(data, tenant)
-    #                 messages.success(request, f"✅ Menú importado exitosamente para {tenant.name}.")
-    #                 return redirect("admin:menu_category_changelist")
-    #             except Exception as e:
-    #                 messages.error(request, f"❌ Error al procesar el archivo JSON: {e}")
-    #     else:
-    #         form = MenuUploadForm()
-
-    #     context = {
-    #         "form": form,
-    #         "title": "Importar Menú desde JSON"
-    #     }
-    #     return render(request, "admin/import_menu.html", context)
-
-    # def process_menu_upload(self, data, tenant):
-    #     """
-    #     Procesa el archivo JSON y carga el menú en la base de datos.
-    #     """
-    #     for category_data in data.get("categories", []):
-    #         category, _ = Category.objects.get_or_create(
-    #             name=category_data["name"],
-    #             tenant=tenant
-    #         )
-
-    #         for item in category_data.get("items", []):
-    #             product, _ = Product.objects.get_or_create(
-    #                 name=item["name"],
-    #                 tenant=tenant,
-    #                 defaults={
-    #                     "category": category,
-    #                     "description": item.get("description", ""),
-    #                     "ingredients": ", ".join(item.get("ingredients", [])),
-    #                     "price": item.get("price", 0),
-    #                     "available": item.get("available", True)
-    #                 }
-    #             )
-                
     def import_menu_button(self):
         """
         Genera un botón en la vista de lista para importar el menú.
@@ -182,6 +134,28 @@ class CategoryAdmin(admin.ModelAdmin):
             "</div>",
             "import-menu/"
         )
+    
+    def save_model(self, request, obj, form, change):
+        """
+        Si se edita manualmente el orden en el Admin, reorganiza las demás categorías.
+        """
+        super().save_model(request, obj, form, change)
+
+        # 🔹 Reorganizar órdenes en caso de huecos o desorden
+        self.reorder_categories(obj.tenant)
+
+    def reorder_categories(self, tenant):
+        """
+        Reorganiza las categorías asegurando que sus números de orden sean secuenciales.
+        """
+        categories = list(Category.objects.filter(tenant=tenant).order_by("order"))
+
+        for index, category in enumerate(categories, start=1):
+            category.order = index
+        
+        # 🔹 Usa `bulk_update` para evitar múltiples llamadas a la BD
+        Category.objects.bulk_update(categories, ["order"])
+
         
     import_menu_button.allow_tags = True
     import_menu_button.short_description = "Importar Menú"
