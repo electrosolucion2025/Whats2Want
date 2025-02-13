@@ -13,8 +13,9 @@ from apps.orders.models import Order, OrderItem
 from apps.payments.models import Payment
 from apps.payments.services import PaymentServiceRedsys, decode_redsys_parameters, generate_payment_link
 from apps.printers.models import PrintTicket
-from apps.whatsapp.utils import send_whatsapp_message
+from apps.whatsapp.utils import send_promotion_opt_in_message, send_whatsapp_message
 from apps.payments.utils import send_order_email
+from apps.whatsapp.models import WhatsAppContact
 
 def redsys_payment_redirect(request, order_id):
     """
@@ -106,6 +107,17 @@ def redsys_notify(request):
             send_whatsapp_message(order.phone_number, confirmation_message, tenant=order.tenant)
 
             send_order_email(order)  # 📧 Enviar correo con el ticket del pedido
+            
+            # 🔹 Obtener el `WhatsAppContact` usando el `phone_number` de la sesión
+            try:
+                whatsapp_contact = WhatsAppContact.objects.get(phone_number=order.phone_number, tenant=order.tenant)
+
+                # 🔹 Si es la primera compra y aún no ha respondido sobre promociones, enviar mensaje interactivo
+                if whatsapp_contact.accepts_promotions is None:
+                    send_promotion_opt_in_message(whatsapp_contact.phone_number, order.tenant)
+                
+            except WhatsAppContact.DoesNotExist:
+                print(f"⚠️ No se encontró un WhatsAppContact para el número {order.phone_number}", flush=True)
             
             print(f"✅ Pago exitoso para el pedido {order.id}", flush=True)
             return JsonResponse({"status": "success", "message": "Pago confirmado"})

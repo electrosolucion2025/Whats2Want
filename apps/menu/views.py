@@ -1,5 +1,5 @@
 import json
-
+from django.db import models
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View

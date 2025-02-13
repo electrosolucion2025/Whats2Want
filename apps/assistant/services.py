@@ -6,22 +6,22 @@ import uuid
 # Third party imports
 import openai
 from django.conf import settings
-from django.utils.timezone import now
-
 
 # Local application imports
 from .prompt import get_base_prompt
 from apps.assistant.models import AIMessage, OpenAIRequestLog
 from apps.chat.models import ChatMessage
 from apps.menu.services import get_menu_data
-from apps.orders.models import Order
 from apps.orders.services import save_order_to_db
 from apps.tenants.models import TenantPrompt
-from apps.whatsapp.utils import send_policy_interactive_message
+from apps.whatsapp.models import WhatsAppContact
+from apps.whatsapp.utils import (
+    send_policy_interactive_message,
+    send_promotion_opt_in_message
+)
 
 
 openai.api_key = settings.OPENAI_API_KEY
-
 
 def remove_json_blocks(text):
     """Eliminar cualquier bloque JSON del texto, ya sea en Markdown o como parte del mensaje."""
@@ -43,7 +43,7 @@ def detect_language_openai(text):
     try:
         response = openai.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "Detecta el idioma de este texto y responde solo con el código de idioma ISO 639-1."},
+            messages=[{"role": "system", "content": "Detecta el idioma de este texto y responde solo con el código de idioma ISO 639-1. Si es un numero (1 o 4), el idioma sigue siendo español:"},
                       {"role": "user", "content": text}]
         )
         detected_lang = response.choices[0].message.content.strip()
@@ -57,7 +57,7 @@ def translate_text_openai(text, target_language):
     try:
         response = openai.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "system", "content": f"Traduce este texto al {target_language}:"},
+            messages=[{"role": "system", "content": f"Traduce este texto al {target_language}, si es un numero (1 o 4), el idioma sigue siendo español:"},
                       {"role": "user", "content": text}]
         )
         return response.choices[0].message.content.strip()
@@ -114,9 +114,16 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
     prompt_content = base_prompt.content if base_prompt else get_base_prompt()
     
     if contact.first_buy:
-        print("🎁 Este es el primer pedido del usuario. Añadiendo mensaje de promoción al prompt.", flush=True)
-        prompt_content += "**PROMOCIÓN ACTIVA**: !Este cliente tiene un café gratis por su primera compra a elegir entre café espresso, cafe con leche y cafe cortado.¡ Si ha pedido un café, dile que es de regalo y pon su 'unit_price': 0 en el JSON, no modifiques otro valor. Para que esta promocion sea valida, el cliente debe haber pedido al menos un producto aparte del café. Si el cliente no ha pedido un café, antes de terminar el pedido, recuerdale la promoción y dile que puede elegir un café gratis si compra al menos un producto adicional."
-    
+        print("🎁 Este es el primer pedido del usuario. Insertando promoción en el prompt.", flush=True)
+
+        promo_message = "**PROMOCIÓN ACTIVA**: ¡Este cliente tiene un café gratis por su primera compra a elegir entre café espresso, café con leche y café cortado! ☕🎉 Si ha pedido un café, dile que es de regalo y pon su 'unit_price': 0 en el JSON, no modifiques otro valor. Para que esta promoción sea válida, el cliente debe haber pedido al menos un producto aparte del café. Si el cliente no ha pedido un café, antes de terminar el pedido, recuérdale la promoción y dile que puede elegir un café gratis si compra al menos un producto adicional."
+
+        # 🔹 Reemplazar marcador en el prompt
+        if "[Insertar promo si hay disponible]" in prompt_content:
+            prompt_content = prompt_content.replace("[Insertar promo si hay disponible]", promo_message)
+        else:
+            print("⚠️ No se encontró el marcador de promoción en el prompt.", flush=True)
+
     # 📋 Obtener el menú del tenant
     menu_data = get_menu_data(session.tenant)
 
@@ -149,7 +156,7 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
     payload = {
         "model": "gpt-4o-mini",
         "messages": messages,
-        "temperature": 0.3,
+        "temperature": 0.4,
     }
 
     try:
@@ -248,6 +255,7 @@ def extract_order_json(context_messages, session):
 
                     # Guardar el pedido
                     save_order_to_db(order_data, session)
+                    
                     print("✅ Pedido guardado en la base de datos.", flush=True)
                 else:
                     print("❌ No se encontró un bloque JSON válido.", flush=True)
@@ -255,16 +263,3 @@ def extract_order_json(context_messages, session):
             except json.JSONDecodeError as e:
                 print(f"❌ Error al decodificar JSON: {e}", flush=True)
             break
-
-def should_include_policies(contact):
-    """ 
-    Verifica si se deben incluir las políticas en la respuesta y, si es así, 
-    actualiza la fecha en la base de datos.
-    """
-    if not contact.last_policy_sent or (now() - contact.last_policy_sent).days >= 30: 
-        # 💾 Guardar la fecha de envío de las políticas
-        contact.last_policy_sent = now()
-        contact.save(update_fields=['last_policy_sent'])    
-        return True  # Se incluyen las políticas
-
-    return False  # No se incluyen las políticas

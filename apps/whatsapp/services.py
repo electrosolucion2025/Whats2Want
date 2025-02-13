@@ -1,17 +1,20 @@
-from hmac import new
 import os
 import uuid
-import requests
-
 from datetime import datetime
+
 from django.utils import timezone
-from django.utils.timezone import make_aware
-from django.utils.timezone import now
+from django.utils.timezone import make_aware, now
 
 from .models import Tenant, WebhookEvent, WhatsAppContact, WhatsAppMessage
 from apps.assistant.services import generate_openai_response
 from apps.chat.services import process_whatsapp_message
-from apps.whatsapp.utils import download_whatsapp_media, send_policy_interactive_message, send_whatsapp_message, transcribe_audio
+from apps.whatsapp.utils import (
+    download_whatsapp_media,
+    mark_message_as_read,
+    send_policy_interactive_message,
+    send_whatsapp_message,
+    transcribe_audio,
+)
 
 def process_webhook_event(data):
     # 🔹 Validaciones iniciales
@@ -104,6 +107,28 @@ def process_webhook_event(data):
                                         tenant
                                     )
                                     return  # 🚨 Detenemos el flujo aquí si rechaza
+                                
+                                elif button_id == 'promotions_accept':
+                                    whatsapp_contact.accepts_promotions = True
+                                    whatsapp_contact.save(update_fields=["accepts_promotions"])
+
+                                    send_whatsapp_message(
+                                        whatsapp_contact.phone_number,
+                                        "🎊 ¡Genial! Te avisaremos sobre ofertas y promociones exclusivas. 🛍️✨",
+                                        tenant
+                                    )
+                                    return
+                                    
+                                elif button_id == 'promotions_decline':
+                                    whatsapp_contact.accepts_promotions = False
+                                    whatsapp_contact.save(update_fields=["accepts_promotions"])
+
+                                    send_whatsapp_message(
+                                        whatsapp_contact.phone_number,
+                                        "🙏 Gracias por tu respuesta. No te preocupes, siempre puedes cambiar de opinión.",
+                                        tenant
+                                    )
+                                    return
 
                         # 🔥 Si el usuario aún NO ha aceptado las políticas, guardamos el mensaje y enviamos el mensaje interactivo
                         if not whatsapp_contact.policy_accepted:
@@ -226,21 +251,3 @@ def create_webhook_event(data, tenant):
         payload=data,
         tenant=tenant
     )
-
-def mark_message_as_read(message_id, tenant):
-    url = f"https://graph.facebook.com/v22.0/{tenant.phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {tenant.whatsapp_access_token}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "status": "read",
-        "message_id": message_id
-    }
-    response = requests.post(url, headers=headers, json=payload)
-    
-    if response.status_code != 200:
-        print(f"❌ Error al marcar como leído: {response.text}")
-    else:
-        print(f"✅ Mensaje {message_id} marcado como leído.")
