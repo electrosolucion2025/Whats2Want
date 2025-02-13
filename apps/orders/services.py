@@ -3,12 +3,21 @@ import uuid
 from decimal import Decimal
 
 # Django imports
+from django.utils import timezone
+
+# Local imports
 from apps.menu.models import Extra, Product
 from apps.orders.models import Order, OrderItem
 from apps.payments.models import Payment
 from apps.payments.services import generate_payment_link
+from apps.payments.utils import send_order_email
+from apps.payments.views import process_successful_payment
+from apps.vip.utils import is_vip
 from apps.whatsapp.models import WhatsAppContact
-from apps.whatsapp.utils import send_whatsapp_message
+from apps.whatsapp.utils import (
+    send_promotion_opt_in_message,
+    send_whatsapp_message,
+)
 
 def generate_order_number():
     number_generated = str(int(uuid.uuid4().int))[:12]
@@ -103,28 +112,82 @@ def save_order_to_db(order_data, session):
             contact.save()
             print(f"🎉 Primera compra registrada para {contact.phone_number}. `first_buy` actualizado a False.", flush=True)
         
-        # 🏦 **Crear registro del pago**
-        payment = Payment.objects.create(
-            tenant=order.tenant,
-            order=order,
-            payment_id=order.order_number,
-            amount=order.total_price,
-            currency="EUR",
-            status="pending",
-            payment_method="Card",
-        )
-        
-        # 📦 PASO 4: Preparar el link de pago
-        payment_link = generate_payment_link(order)
-        
-        # 📩 PASO 5: Enviar el link al usuario por WhatsApp
-        message = (
-            f"🔗 Para pagar, haz clic aquí: {payment_link}\n\n"
-            f"📌 Una vez completado el pago, recibirás la confirmación. 😊"
-        )
-        
-        send_whatsapp_message(session.phone_number, message, tenant=session.tenant)
-        print(f"✉️ Mensaje enviado al usuario: {message}", flush=True)
+        # 🔍 **Verificar si el usuario es VIP**
+        is_vip_user = is_vip(session.phone_number, session.tenant)
+
+        if is_vip_user:
+            print("🏆 Cliente VIP detectado. Saltando proceso de pago...", flush=True)
+            
+            # 🏦 **Marcar el pago como completado sin requerir transacción**
+            payment = Payment.objects.create(
+                tenant=order.tenant,
+                order=order,
+                payment_id=order.order_number,
+                amount=order.total_price,
+                currency="EUR",
+                status="completed",  # 🏆 Pago automáticamente completado
+                payment_method="VIP",
+            )
+
+            # 📝 **Actualizar el estado del pedido**
+            order.payment_status = "PAID"
+            order.status = "COMPLETED"
+            order.save()
+
+            # 🚪 **Cerrar la sesión del usuario VIP**
+            chat_session = order.chat_session
+            if chat_session:
+                chat_session.is_active = False
+                chat_session.ended_at = timezone.now()
+                chat_session.save()
+                print(f"🔒 Sesión {chat_session.id} cerrada tras el pedido VIP {order.order_number}", flush=True)
+
+            # 🖨️ **Generar los tickets de impresión**
+            process_successful_payment(order)
+            print(f"🖨️ Tickets de impresión generados para el pedido VIP {order.order_number}", flush=True)
+
+            print(f"🔍 Contenido de SESSION: {session}", flush=True)
+
+            # 📩 **Enviar mensaje de confirmación al usuario VIP**
+            confirmation_message = (
+                f"🏆 ¡Gracias por tu pedido VIP! 🎉\n"
+                f"📌 Pedido: {order.order_number}\n"
+                f"📦 Tu pedido está en preparación. ¡Disfrútalo! 😊"
+            )
+            send_whatsapp_message(order.phone_number, confirmation_message, tenant=order.tenant)
+            
+            # 📧 Enviar correo con el ticket del pedido
+            send_order_email(order)
+
+            # 🔹 Comprobar si el usuario ya aceptó recibir promociones
+            try:
+                whatsapp_contact = WhatsAppContact.objects.get(phone_number=order.phone_number, tenant=order.tenant)
+                if whatsapp_contact.accepts_promotions is None:
+                    send_promotion_opt_in_message(whatsapp_contact.phone_number, order.tenant)
+            except WhatsAppContact.DoesNotExist:
+                pass
+
+        else:
+            # 📦 **Generar el link de pago normalmente**
+            payment = Payment.objects.create(
+                tenant=order.tenant,
+                order=order,
+                payment_id=order.order_number,
+                amount=order.total_price,
+                currency="EUR",
+                status="pending",
+                payment_method="Card",
+            )
+
+            # 📩 **Generar y enviar el link de pago**
+            payment_link = generate_payment_link(order)
+            message = (
+                f"🔗 Para pagar, haz clic aquí: {payment_link}\n\n"
+                f"📌 Una vez completado el pago, recibirás la confirmación. 😊"
+            )
+            send_whatsapp_message(session.phone_number, message, tenant=session.tenant)
+            
+            print(f"✉️ Mensaje enviado al usuario: {message}", flush=True)
 
     except Exception as e:
         print(f"❌ Error al guardar el pedido: {e}", flush=True)

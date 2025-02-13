@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from datetime import datetime
 
@@ -163,8 +164,10 @@ def process_webhook_event(data):
                             message, assistant_session, whatsapp_contact, transcribed_text=transcribed_text
                         )
                         
+                        ai_response_sanitized = sanitize_ai_response(ai_response)
+                        
                         # 🚀 Enviar la respuesta a WhatsApp
-                        send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)
+                        send_whatsapp_message(whatsapp_contact.phone_number, ai_response_sanitized, tenant)
                         
                         # 🚀 Actualizar el mensaje como leído
                         mark_message_as_read(message.get('id'), tenant)
@@ -251,3 +254,25 @@ def create_webhook_event(data, tenant):
         payload=data,
         tenant=tenant
     )
+
+def sanitize_ai_response(response: str) -> str:
+    # Lista de frases o palabras que queremos eliminar
+    forbidden_phrases = [
+        "Aquí tienes el resumen del pedido en formato JSON:",
+        "Aquí tienes el resumen de tu pedido en formato JSON:",
+        "Este es el resumen del pedido:",
+        "JSON resultante:",
+        "Aquí está el resultado en JSON:",
+        "Resumen del pedido:",
+        "Resultado:",
+        "Salida JSON:"
+    ]
+    
+    # Eliminar cada frase prohibida de la respuesta
+    for phrase in forbidden_phrases:
+        response = response.replace(phrase, "").strip()
+
+    # Opcional: Eliminar líneas en blanco generadas por los reemplazos
+    # response = re.sub(r'\n\s*\n', '\n', response)
+
+    return response

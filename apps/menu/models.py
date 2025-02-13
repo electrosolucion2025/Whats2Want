@@ -42,16 +42,6 @@ class Category(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Última actualización")
 
-    def save(self, *args, **kwargs):
-        """
-        Antes de guardar, si `order` es 1 (valor por defecto), asigna el siguiente número disponible.
-        """
-        if not self.order or self.order == 1:  # 🔹 Si no tiene orden o es 1, asignar el siguiente disponible
-            last_order = Category.objects.filter(tenant=self.tenant).aggregate(models.Max("order"))["order__max"] or 0
-            self.order = last_order + 1  # 🔹 Asignar el siguiente número secuencial
-
-        super().save(*args, **kwargs)
-
     @classmethod
     def get_total_categories(cls, tenant=None):
         """
