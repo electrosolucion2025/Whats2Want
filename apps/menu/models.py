@@ -36,18 +36,38 @@ class Category(models.Model):
     name = models.CharField(max_length=100, verbose_name="Nombre de la categoría")  # 🟢 Obligatorio
     description = models.TextField(blank=True, null=True, verbose_name="Descripción")
     image = models.ImageField(upload_to='categories/', blank=True, null=True, verbose_name="Imagen")
-    order = models.PositiveIntegerField(default=0, verbose_name="Orden de aparición")
+    order = models.PositiveIntegerField(default=1, verbose_name="Orden de aparición")  # 🔹 Ahora inicia en 1
     is_active = models.BooleanField(default=True, verbose_name="¿Activo?")
     print_zones = models.ManyToManyField('printers.PrinterZone', blank=True, verbose_name="Zonas de impresión")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Última actualización")
 
+    def save(self, *args, **kwargs):
+        """
+        Antes de guardar, si `order` es 1 (valor por defecto), asigna el siguiente número disponible.
+        """
+        if not self.order or self.order == 1:  # 🔹 Si no tiene orden o es 1, asignar el siguiente disponible
+            last_order = Category.objects.filter(tenant=self.tenant).aggregate(models.Max("order"))["order__max"] or 0
+            self.order = last_order + 1  # 🔹 Asignar el siguiente número secuencial
+
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_total_categories(cls, tenant=None):
+        """
+        Devuelve el total de categorías activas, opcionalmente filtrando por `tenant`.
+        """
+        if tenant:
+            return cls.objects.filter(is_active=True, tenant=tenant).count()
+        return cls.objects.filter(is_active=True).count()
+
     def __str__(self):
-        return self.name
+        return f"{self.order}. {self.name}"
 
     class Meta:
         verbose_name = "Categoría"
         verbose_name_plural = "Categorías"
+        ordering = ["order"]  # 🔹 Asegura que siempre se ordenen correctamente
 
 # Modelo de Extras
 class Extra(models.Model):

@@ -1,3 +1,4 @@
+import json
 import tempfile
 import openai
 import requests
@@ -30,6 +31,50 @@ def send_whatsapp_message(to_phone_number, ai_response, tenant):
     
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
+
+def send_policy_interactive_message(phone_number, tenant):
+    """
+    Envía un mensaje interactivo en WhatsApp para que el usuario acepte o rechace la política de privacidad.
+    """
+    url = f"https://graph.facebook.com/v22.0/{tenant.phone_number_id}/messages"
+
+    headers = {
+        "Authorization": f"Bearer {tenant.whatsapp_access_token}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": phone_number,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "header": {
+                "type": "text",
+                "text": "Política de Privacidad"
+            },
+            "body": {
+                "text": "Para continuar, debes aceptar nuestra política de privacidad:\n\n🔗 Política de Privacidad \nhttps://politicas-y-derechos-de-uso.up.railway.app\n\n¿Aceptas nuestros términos?"
+            },
+            "footer": {
+                "text": "Whats2Want Services"
+            },
+            "action": {
+                "buttons": [
+                    {"type": "reply", "reply": {"id": "policy_accept", "title": "✅ Acepto"}},
+                    {"type": "reply", "reply": {"id": "policy_decline", "title": "❌ No Acepto"}}
+                ]
+            }
+        }
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+    
+    if response.status_code == 200:
+        print("✅ Mensaje interactivo enviado correctamente")
+    else:
+        print(f"❌ Error al enviar mensaje interactivo: {response.text}")
 
 def download_whatsapp_media(media_id, tenant):
     """Descargar archivos multimedia de WhatsApp"""

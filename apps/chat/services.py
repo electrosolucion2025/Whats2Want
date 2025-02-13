@@ -5,7 +5,7 @@ from apps.assistant.models import AIMessage, AssistantSession
 from apps.chat.models import ChatMessage, ChatSession
 
 # TODO: Definir el tiempo de inactividad para cerrar la sesión
-SESSION_TIMEOUT = timedelta(minutes=3)  # Tiempo de inactividad para cerrar la sesión
+SESSION_TIMEOUT = timedelta(minutes=5)  # Tiempo de inactividad para cerrar la sesión
 
 
 # ✅ 1️⃣ Gestión de la sesión de chat
@@ -65,6 +65,7 @@ def process_whatsapp_message(message, contact, tenant, transcribed_text=None):
     Procesa el mensaje de WhatsApp para gestionar la sesión de chat y la IA.
     Si es un audio, usa `transcribed_text` como el contenido del mensaje.
     """
+    print("🔥🔥🔥🔥🔥 process_whatsapp_message", message, flush=True)
     # Determinar el contenido del mensaje
     if transcribed_text:  # Si es un audio transcrito, usarlo
         message_content = transcribed_text

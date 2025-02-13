@@ -7,8 +7,16 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import IsAuthenticated
 
-from .models import Category, Product, Extra, Allergen, ProductAllergen, ExtraAllergen, ProductExtra
 from apps.tenants.models import Tenant
+from .models import (
+    Allergen,
+    Category,
+    Extra,
+    ExtraAllergen,
+    Product,
+    ProductAllergen,
+    ProductExtra,
+)
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -26,9 +34,19 @@ class MenuUploadView(View):
                 return JsonResponse({'error': 'Tenant no encontrado'}, status=404)
 
             for category_data in data.get('categories', []):
+                # 🔹 Obtener el orden si está presente, de lo contrario, asignar el siguiente número disponible
+                order = category_data.get('order')  # Si existe en el JSON, lo toma
+                if not order:  # Si no existe, asignar el siguiente número secuencial
+                    last_order = Category.objects.filter(tenant=tenant).aggregate(models.Max("order"))["order__max"] or 0
+                    order = last_order + 1
+
                 category, _ = Category.objects.get_or_create(
                     name=category_data['name'],
-                    tenant=tenant
+                    tenant=tenant,
+                    defaults={
+                        "description": category_data.get("description", ""),
+                        "order": order  # ✅ Siempre tendrá un número válido
+                    }
                 )
 
                 for item in category_data.get('items', []):
@@ -66,7 +84,7 @@ class MenuUploadView(View):
                         )
                         process_allergens_and_extras(item, product, tenant)
 
-            return JsonResponse({'status': 'Menu uploaded successfully'}, status=201)
+            return JsonResponse({'status': 'Menú importado exitosamente'}, status=201)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)

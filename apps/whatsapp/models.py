@@ -74,6 +74,8 @@ class WhatsAppContact(models.Model):
     wa_id = models.CharField(max_length=50, unique=True, verbose_name="WhatsApp ID")
     last_interaction = models.DateTimeField(auto_now=True, verbose_name="Last Interaction")
     last_policy_sent = models.DateTimeField(null=True, blank=True, verbose_name="Last Policy Sent")
+    policy_accepted = models.BooleanField(default=False, verbose_name="Policy Accepted")
+    last_message_before_policy = models.TextField(null=True, blank=True, verbose_name="Last Message Before Policy")
     first_buy = models.BooleanField(default=True, verbose_name="First Buy")
 
     class Meta:

@@ -8,6 +8,7 @@ import openai
 from django.conf import settings
 from django.utils.timezone import now
 
+
 # Local application imports
 from .prompt import get_base_prompt
 from apps.assistant.models import AIMessage, OpenAIRequestLog
@@ -16,6 +17,7 @@ from apps.menu.services import get_menu_data
 from apps.orders.models import Order
 from apps.orders.services import save_order_to_db
 from apps.tenants.models import TenantPrompt
+from apps.whatsapp.utils import send_policy_interactive_message
 
 
 openai.api_key = settings.OPENAI_API_KEY
@@ -92,6 +94,10 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
 
     if not user_message:
         return "No se recibió ningún contenido válido para procesar."
+    
+    if not contact.policy_accepted:
+        send_policy_interactive_message(contact.phone_number, session.tenant)
+        return "📜 Antes de continuar, por favor acepta nuestra política de privacidad en el mensaje interactivo enviado. Gracias."
 
     # 🔍 Detectar idioma antes de continuar
     detected_language = detect_language_openai(user_message)
@@ -106,28 +112,9 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
     # 📋 Obtener el prompt base del tenant
     base_prompt = TenantPrompt.objects.filter(tenant=session.tenant, is_active=True).first()
     prompt_content = base_prompt.content if base_prompt else get_base_prompt()
-
-    # 📋 Verificar si se deben incluir las políticas
-    include_policies = should_include_policies(contact)
-    
-    if not include_policies:
-        prompt_content = prompt_content.replace(
-            "Di el mensaje con la politica de privacidad (Si lo tienes que decir, dilo siempre al principio, en el primer mensaje, junto con el saludo)",
-            "Evita decir las politicas a no ser que te pregunten por ellas. Este usuario ya las aceptó."
-        )
     
     if contact.first_buy:
         print("🎁 Este es el primer pedido del usuario. Añadiendo mensaje de promoción al prompt.", flush=True)
-        
-        # prompt_content += (
-        #     "\n\n🚀 **PROMOCIÓN ACTIVA**: Este cliente tiene un café gratis a elegir entre los 3 cafés mas baratos que tengas. "
-        #     "Fuera de esos, cóbralos todos en su primera compra, siempre que haya comprado al menos un producto aparte del café. "
-        #     "Antes de finalizar el pedido, asegúrate de que el precio de uno de los cafés sea 0. Si el cliente pide varios cafés, "
-        #     "asegúrate de que el precio de uno de los cafés sea 0. Siempre pon a 0 el café más barato. Si el cliente no pide café, "
-        #     "recuerda decirle que puede pedir uno gratis si compra al menos un producto adicional. Para el café gratis en el JSON, "
-        #     "modifica el `unit_price` a 0."
-        # )
-        
         prompt_content += "**PROMOCIÓN ACTIVA**: !Este cliente tiene un café gratis por su primera compra a elegir entre café espresso, cafe con leche y cafe cortado.¡ Si ha pedido un café, dile que es de regalo y pon su 'unit_price': 0 en el JSON, no modifiques otro valor. Para que esta promocion sea valida, el cliente debe haber pedido al menos un producto aparte del café. Si el cliente no ha pedido un café, antes de terminar el pedido, recuerdale la promoción y dile que puede elegir un café gratis si compra al menos un producto adicional."
     
     # 📋 Obtener el menú del tenant
