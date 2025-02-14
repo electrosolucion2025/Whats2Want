@@ -1,10 +1,9 @@
 import os
-import re
 import uuid
 from datetime import datetime
 
-from django.utils import timezone
 from django.utils.timezone import make_aware, now
+from django.db import transaction
 
 from .models import Tenant, WebhookEvent, WhatsAppContact, WhatsAppMessage
 from apps.assistant.services import generate_openai_response
@@ -17,262 +16,187 @@ from apps.whatsapp.utils import (
     transcribe_audio,
 )
 
+
 def process_webhook_event(data):
+    """Procesa los eventos recibidos desde WhatsApp de manera eficiente."""
+    
     # 🔹 Validaciones iniciales
-    entry_list = data.get("entry", [])
+    entry_list = data.get("entry")
     if not entry_list:
-        print("❌ Error: 'entry' no encontrado en el JSON o está vacío", flush=True)
+        print("❌ Error: 'entry' no encontrado en JSON", flush=True)
         return
 
-    changes_list = entry_list[0].get("changes", [])
-    if not changes_list:
-        print("❌ Error: 'changes' no encontrado en el JSON o está vacío", flush=True)
-        return
-
-    value_data = changes_list[0].get("value", {})
+    value_data = entry_list[0].get("changes", [{}])[0].get("value")
     if not value_data:
         print("❌ Error: 'value' no encontrado en 'changes'", flush=True)
         return
 
-    metadata = value_data.get("metadata", {})
-    if not metadata:
-        print("❌ Error: 'metadata' no encontrado en 'value'", flush=True)
+    business_phone_number = value_data.get("metadata", {}).get("display_phone_number")
+    
+    # 🔹 Obtener el Tenant asociado al número de WhatsApp
+    tenant = Tenant.objects.filter(phone_number=business_phone_number).first()
+    if not tenant:
+        print(f"❌ Tenant no encontrado para {business_phone_number}", flush=True)
         return
 
-    # 1️⃣ Obtener el número de teléfono receptor del webhook
-    business_phone_number = metadata.get('display_phone_number')
+    # 🔹 Guardar el evento en la base de datos (Evita bloqueos con transaction.atomic)
+    with transaction.atomic():
+        webhook_event = WebhookEvent.objects.create(
+            event_type=data.get("object"), payload=data, tenant=tenant
+        )
 
-    # 2️⃣ Obtener el Tenant asociado a ese número
-    try:
-        tenant = Tenant.objects.get(phone_number=business_phone_number)
-    except Tenant.DoesNotExist:
-        raise ValueError('Tenant no encontrado para el número de teléfono')
+    # 🔹 Procesar mensajes entrantes
+    for entry in entry_list:
+        for change in entry.get("changes", []):
+            value = change.get("value", {})
 
-    # 3️⃣ Guardar el evento del webhook
-    webhook_event = create_webhook_event(data, tenant)
+            if "messages" in value:
+                contacts = {c["wa_id"]: c.get("profile", {}).get("name") for c in value.get("contacts", [])}
+                messages = value.get("messages", [])
 
-    # 4️⃣ Procesar cada cambio recibido
-    for entry in data.get('entry', []):
-        for change in entry.get('changes', []):
-            value = change.get('value', {})
-            
-            if 'messages' in value:
-                contacts = value.get('contacts', [])
-                messages = value.get('messages', [])
+                # 🔹 Procesar cada mensaje
+                for message in messages:
+                    process_whatsapp_message_entry(message, contacts, tenant)
 
-                for contact in contacts:
-                    whatsapp_contact = save_or_update_contact(contact, tenant)
 
-                    for message in messages:
-                        message_type = message.get('type')
-                        transcribed_text = None
-                        original_message_text = message.get('text', {}).get('body')  # 🔥 Guardamos el mensaje original
+def process_whatsapp_message_entry(message, contacts, tenant):
+    """Procesa un solo mensaje recibido de WhatsApp."""
+    message_type = message.get("type")
+    from_number = message.get("from")
+    
+    # 🔹 Buscar o crear el contacto
+    whatsapp_contact, created = WhatsAppContact.objects.get_or_create(
+        wa_id=from_number,
+        defaults={
+            "name": contacts.get(from_number),
+            "tenant": tenant,
+            "phone_number": from_number,
+            "last_interaction": now()
+        }
+    )
 
-                        # 🔥 Si el mensaje es una interacción de botón
-                        if message_type == 'interactive':
-                            interactive_type = message.get('interactive', {}).get('type')
+    if not created:
+        whatsapp_contact.last_interaction = now()
+        whatsapp_contact.save(update_fields=["last_interaction"])
 
-                            if interactive_type == 'button_reply':
-                                button_id = message.get('interactive', {}).get('button_reply', {}).get('id')
+    # 🔹 Procesar interacciones de botones
+    if message_type == "interactive":
+        handle_interactive_message(message, whatsapp_contact, tenant)
+        return
 
-                                if button_id == 'policy_accept':
-                                    # ✅ Guardamos la aceptación en la base de datos
-                                    whatsapp_contact.policy_accepted = True
-                                    whatsapp_contact.save(update_fields=["policy_accepted"])
+    # 🔹 Si aún NO aceptó la política, enviamos el mensaje de aceptación
+    if not whatsapp_contact.policy_accepted:
+        save_original_message(whatsapp_contact, message.get("text", {}).get("body"))
+        send_policy_interactive_message(whatsapp_contact.phone_number, tenant)
+        return
 
-                                    send_whatsapp_message(
-                                        whatsapp_contact.phone_number,
-                                        "✅ Gracias por aceptar nuestra política de privacidad. Enseguida te atenderemos.",
-                                        tenant
-                                    )
+    # 🔹 Procesar mensaje de audio
+    transcribed_text = None
+    if message_type == "audio":
+        transcribed_text = process_audio_message(message, tenant)
 
-                                    # 🚀 **Recuperamos el último mensaje guardado antes de enviar las políticas**
-                                    last_saved_message = get_last_saved_message(whatsapp_contact)
+    # 🔹 Guardar el mensaje en la base de datos
+    new_message = save_message(message, tenant, transcribed_text)
+    if new_message is None:
+        print("⚠️ Mensaje duplicado, ignorando...", flush=True)
+        return
 
-                                    if last_saved_message:
-                                        print("📩 Procesando el mensaje original después de aceptar políticas:", last_saved_message, flush=True)
+    # 🔹 Procesar el mensaje en la sesión del asistente
+    assistant_session = process_whatsapp_message(message, whatsapp_contact, tenant, transcribed_text=transcribed_text)
 
-                                        # ✅ **Creamos un mensaje igual al que WhatsApp envía**
-                                        message = {
-                                            "from": whatsapp_contact.phone_number,  # Número del usuario
-                                            "id": str(uuid.uuid4()),  # ID ficticio para evitar duplicados
-                                            "timestamp": int(now().timestamp()),  # Timestamp actual
-                                            "text": {"body": last_saved_message},  # Mensaje original
-                                            "type": "text"  # Tipo de mensaje
-                                        }
+    # 🔹 Generar y enviar la respuesta de OpenAI
+    ai_response = sanitize_ai_response(generate_openai_response(message, assistant_session, whatsapp_contact, transcribed_text))
+    send_whatsapp_message(whatsapp_contact.phone_number, ai_response, tenant)
 
-                                elif button_id == 'policy_decline':
-                                    send_whatsapp_message(
-                                        whatsapp_contact.phone_number,
-                                        "❌ Lo siento, no puedes continuar sin aceptar nuestra política de privacidad. Gracias por tu comprensión.",
-                                        tenant
-                                    )
-                                    return  # 🚨 Detenemos el flujo aquí si rechaza
-                                
-                                elif button_id == 'promotions_accept':
-                                    whatsapp_contact.accepts_promotions = True
-                                    whatsapp_contact.save(update_fields=["accepts_promotions"])
+    # 🔹 Marcar mensaje como leído
+    mark_message_as_read(message.get("id"), tenant)
 
-                                    send_whatsapp_message(
-                                        whatsapp_contact.phone_number,
-                                        "🎊 ¡Genial! Te avisaremos sobre ofertas y promociones exclusivas. 🛍️✨",
-                                        tenant
-                                    )
-                                    return
-                                    
-                                elif button_id == 'promotions_decline':
-                                    whatsapp_contact.accepts_promotions = False
-                                    whatsapp_contact.save(update_fields=["accepts_promotions"])
 
-                                    send_whatsapp_message(
-                                        whatsapp_contact.phone_number,
-                                        "🙏 Gracias por tu respuesta. No te preocupes, siempre puedes cambiar de opinión.",
-                                        tenant
-                                    )
-                                    return
+def handle_interactive_message(message, whatsapp_contact, tenant):
+    """Procesa interacciones de botones en WhatsApp."""
+    button_id = message.get("interactive", {}).get("button_reply", {}).get("id")
 
-                        # 🔥 Si el usuario aún NO ha aceptado las políticas, guardamos el mensaje y enviamos el mensaje interactivo
-                        if not whatsapp_contact.policy_accepted:
-                            print("📌 Guardando el mensaje original para cuando acepte políticas:", original_message_text, flush=True)
-                            save_original_message(whatsapp_contact, original_message_text)  # 🛠️ Guardamos el mensaje original
-                            send_policy_interactive_message(whatsapp_contact.phone_number, tenant)
-                            return  # 🚨 IMPORTANTE: No procesamos más
+    responses = {
+        "policy_accept": ("✅ Gracias por aceptar nuestra política. Enseguida te atenderemos.", True),
+        "policy_decline": ("❌ No puedes continuar sin aceptar la política.", False),
+        "promotions_accept": ("🎊 ¡Genial! Te avisaremos sobre promociones exclusivas. 🛍️✨", True),
+        "promotions_decline": ("🙏 Gracias por tu respuesta. Siempre puedes cambiar de opinión.", False),
+    }
 
-                        # 🔥 Si el mensaje es un audio, descargar y transcribirlo
-                        if message_type == 'audio':
-                            audio_id = message.get('audio', {}).get('id')
-                            audio_path = download_whatsapp_media(audio_id, tenant)
-                            
-                            if audio_path:
-                                transcribed_text = transcribe_audio(audio_path)
-                                os.remove(audio_path)
+    if button_id in responses:
+        message_text, accepted = responses[button_id]
+        
+        if "policy" in button_id:
+            whatsapp_contact.policy_accepted = accepted
+        elif "promotions" in button_id:
+            whatsapp_contact.accepts_promotions = accepted
 
-                        # 🚀 Guardar el mensaje en la base de datos
-                        new_message = save_message(message, tenant, business_phone_number, transcribed_text=transcribed_text)
-                        
-                        if new_message is None:
-                            print("⚠️ Mensaje duplicado detectado. No se procesará nuevamente.")
-                            continue
-                        
-                        # 🚀 Procesar el mensaje para gestionar la sesión de chat
-                        assistant_session = process_whatsapp_message(
-                            message, whatsapp_contact, tenant, transcribed_text=transcribed_text
-                        )
-                        
-                        # 🚀 Generar la respuesta de OpenAI
-                        ai_response = generate_openai_response(
-                            message, assistant_session, whatsapp_contact, transcribed_text=transcribed_text
-                        )
-                        
-                        ai_response_sanitized = sanitize_ai_response(ai_response)
-                        
-                        # 🚀 Enviar la respuesta a WhatsApp
-                        send_whatsapp_message(whatsapp_contact.phone_number, ai_response_sanitized, tenant)
-                        
-                        # 🚀 Actualizar el mensaje como leído
-                        mark_message_as_read(message.get('id'), tenant)
-                        
+        whatsapp_contact.save(update_fields=["policy_accepted", "accepts_promotions"])
+        send_whatsapp_message(whatsapp_contact.phone_number, message_text, tenant)
+
+        if button_id == "policy_accept":
+            last_message = get_last_saved_message(whatsapp_contact)
+            if last_message:
+                process_whatsapp_message_entry(
+                    {"from": whatsapp_contact.phone_number, "id": str(uuid.uuid4()), "timestamp": int(now().timestamp()), "text": {"body": last_message}, "type": "text"},
+                    {whatsapp_contact.phone_number: whatsapp_contact.name},
+                    tenant
+                )
+        return
+
+
+def process_audio_message(message, tenant):
+    """Descarga y transcribe un mensaje de audio."""
+    audio_id = message.get("audio", {}).get("id")
+    audio_path = download_whatsapp_media(audio_id, tenant)
+    if audio_path:
+        transcribed_text = transcribe_audio(audio_path)
+        os.remove(audio_path)
+        return transcribed_text
+    return None
+
+
+def save_message(message, tenant, transcribed_text=None):
+    """Guarda un mensaje en la base de datos evitando duplicados."""
+    message_id = message.get("id")
+    if WhatsAppMessage.objects.filter(message_id=message_id).exists():
+        return None
+
+    message_data = {
+        "from_number": message.get("from"),
+        "to_number": tenant.phone_number,
+        "message_type": message.get("type"),
+        "content": message.get("text", {}).get("body") if message.get("type") == "text" else transcribed_text,
+        "status": "delivered",
+        "direction": "inbound",
+        "timestamp": make_aware(datetime.fromtimestamp(int(message.get("timestamp")))),
+        "tenant": tenant,
+    }
+
+    return WhatsAppMessage.objects.create(message_id=message_id, **message_data)
+
+
+def sanitize_ai_response(response: str) -> str:
+    """Elimina contenido no deseado en la respuesta de OpenAI."""
+    forbidden_phrases = [
+        "Aquí tienes el resumen del pedido en formato JSON:",
+        "Este es el resumen del pedido:",
+        "Resultado:",
+    ]
+    for phrase in forbidden_phrases:
+        response = response.replace(phrase, "").strip()
+    return response
+
 def save_original_message(contact, message_text):
     """Guarda el último mensaje antes de enviar la política."""
-    print("🔥🔥🔥🔥🔥 save_original_message", message_text, flush=True)
     if message_text:
         contact.last_message_before_policy = message_text
         contact.save(update_fields=["last_message_before_policy"])
-        
+
+
 def get_last_saved_message(contact):
     """Obtiene el último mensaje guardado antes de la política y lo borra después de usarlo."""
     last_message = contact.last_message_before_policy
     contact.last_message_before_policy = None  # 🔥 Borramos el mensaje después de usarlo
     contact.save(update_fields=["last_message_before_policy"])
     return last_message
-
-def save_or_update_contact(contact, tenant):
-    wa_id = contact.get('wa_id')
-    name = contact.get('profile', {}).get('name')
-    
-    whatsapp_contact, created = WhatsAppContact.objects.get_or_create(
-        wa_id=wa_id,
-        defaults={
-            'name': name,
-            'tenant': tenant,
-            'phone_number': wa_id,
-            'last_interaction': timezone.now()
-        }
-    )
-    
-    if not created:
-        whatsapp_contact.name = name
-        whatsapp_contact.last_interaction = timezone.now()
-        whatsapp_contact.save()
-    
-    return whatsapp_contact
-
-def save_message(message, tenant, phone_number, transcribed_text=None):
-    """
-    Guarda el mensaje de WhatsApp en la base de datos.
-    Si es un mensaje de audio, almacena la transcripción en `content`.
-    """
-    message_id = message.get("id")
-    message_from = message.get("from")
-    message_type = message.get("type")
-    timestamp = message.get("timestamp")
-    
-    # Verificar si el mensaje ya existe
-    if WhatsAppMessage.objects.filter(message_id=message_id).exists():
-        return None
-
-    # Si el mensaje es de texto, extraer el contenido normal
-    if message_type == "text":
-        content = message.get("text", {}).get("body")
-    elif message_type == "audio" and transcribed_text:
-        content = transcribed_text  # Usar la transcripción como contenido del mensaje
-    else:
-        content = None  # Para otros tipos de mensajes que no manejamos ahora
-
-    # Convertir timestamp a datetime
-    timestamp = make_aware(datetime.fromtimestamp(int(timestamp)))
-
-    new_message, _ = WhatsAppMessage.objects.get_or_create(
-        message_id=message_id,
-        defaults={
-            "from_number": message_from,
-            "to_number": phone_number,
-            "message_type": message_type,
-            "content": content,  # Aquí guardamos la transcripción si es un audio
-            "status": "delivered",
-            "direction": "inbound",
-            "timestamp": timestamp,
-            "tenant": tenant,
-        },
-    )
-    
-    return new_message
-
-def create_webhook_event(data, tenant):
-    return WebhookEvent.objects.create(
-        event_type=data.get('object'),
-        payload=data,
-        tenant=tenant
-    )
-
-def sanitize_ai_response(response: str) -> str:
-    # Lista de frases o palabras que queremos eliminar
-    forbidden_phrases = [
-        "Aquí tienes el resumen del pedido en formato JSON:",
-        "Aquí tienes el resumen de tu pedido en formato JSON:",
-        "Este es el resumen del pedido:",
-        "JSON resultante:",
-        "Aquí está el resultado en JSON:",
-        "Resumen del pedido:",
-        "Resultado:",
-        "Salida JSON:"
-    ]
-    
-    # Eliminar cada frase prohibida de la respuesta
-    for phrase in forbidden_phrases:
-        response = response.replace(phrase, "").strip()
-
-    # Opcional: Eliminar líneas en blanco generadas por los reemplazos
-    # response = re.sub(r'\n\s*\n', '\n', response)
-
-    return response
