@@ -41,7 +41,7 @@ def detect_language_openai(text):
     try:
         response = openai.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "Detecta el idioma de este texto y responde solo con el código de idioma ISO 639-1. Si es un numero (1 o 4), el idioma sigue siendo español:"},
+            messages=[{"role": "system", "content": "Detecta el idioma de este texto y responde solo con el código de idioma ISO 639-1. Si unicamente te escriben un valor numerico (1 o 4), el idioma sigue siendo español:"},
                       {"role": "user", "content": text}]
         )
         detected_lang = response.choices[0].message.content.strip()
@@ -55,7 +55,7 @@ def translate_text_openai(text, target_language):
     try:
         response = openai.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "system", "content": f"Traduce este texto al {target_language}, si es un numero (1 o 4), el idioma sigue siendo español:"},
+            messages=[{"role": "system", "content": f"Traduce este texto al {target_language}, si unicamente te escriben un valor numerico (1 o 4), el idioma sigue siendo español:"},
                       {"role": "user", "content": text}]
         )
         return response.choices[0].message.content.strip()
