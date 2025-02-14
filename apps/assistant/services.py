@@ -14,10 +14,8 @@ from apps.chat.models import ChatMessage
 from apps.menu.services import get_menu_data
 from apps.orders.services import save_order_to_db
 from apps.tenants.models import TenantPrompt
-from apps.whatsapp.models import WhatsAppContact
 from apps.whatsapp.utils import (
     send_policy_interactive_message,
-    send_promotion_opt_in_message
 )
 
 
@@ -154,7 +152,7 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
     # 📦 Preparar la solicitud a OpenAI
     request_id = str(uuid.uuid4())
     payload = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4o",
         "messages": messages,
         "temperature": 0.4,
     }

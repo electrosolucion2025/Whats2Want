@@ -77,6 +77,7 @@ class WhatsAppContact(models.Model):
     last_message_before_policy = models.TextField(null=True, blank=True, verbose_name="Last Message Before Policy")
     first_buy = models.BooleanField(default=True, verbose_name="First Buy")
     accepts_promotions = models.BooleanField(null=True, verbose_name="Acepta Promociones")  # None = no ha respondido
+    last_detected_language = models.CharField(max_length=5, default="es")
 
     class Meta:
         verbose_name = "WhatsApp Contact"
