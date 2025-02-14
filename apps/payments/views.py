@@ -112,8 +112,8 @@ def redsys_notify(request):
             try:
                 whatsapp_contact = WhatsAppContact.objects.get(phone_number=order.phone_number, tenant=order.tenant)
 
-                # 🔹 Si es la primera compra y aún no ha respondido sobre promociones, enviar mensaje interactivo
-                if whatsapp_contact.accepts_promotions is None:
+                # 🔹 Si no ha respondido sobre promociones, enviar mensaje interactivo
+                if not whatsapp_contact.accepts_promotions:
                     send_promotion_opt_in_message(whatsapp_contact.phone_number, order.tenant)
                 
             except WhatsAppContact.DoesNotExist:
