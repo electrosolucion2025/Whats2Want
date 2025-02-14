@@ -8,9 +8,10 @@ from django.contrib.auth import get_user_model
 def create_superuser():
     """Crea un superusuario automáticamente si no existe."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "w2w.settings")
-    django.setup()  # Asegurar que Django está cargado antes de acceder a los modelos
+    django.setup()  # Necesario para inicializar Django
 
     User = get_user_model()
+    
     if not User.objects.filter(username=os.getenv("DJANGO_ADMIN_USER")).exists():
         User.objects.create_superuser(
             username=os.getenv("DJANGO_ADMIN_USER"),
@@ -18,13 +19,18 @@ def create_superuser():
             password=os.getenv("DJANGO_ADMIN_PASSWORD")
         )
         print("✅ Superusuario creado automáticamente.")
+    else:
+        print("⚠️ Superusuario ya existente. No se creó uno nuevo.")
 
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'w2w.settings')
     
-    # Crear superusuario si está habilitado
+    # LOG de depuración para verificar que la función se ejecuta
+    print("🟢 Ejecutando manage.py en Render...")
+
     if os.getenv("AUTO_CREATE_SUPERUSER") == "True":
+        print("🔹 AUTO_CREATE_SUPERUSER está activo, intentando crear superusuario...")
         create_superuser()
 
     try:
