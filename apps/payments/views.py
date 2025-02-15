@@ -257,11 +257,8 @@ EMOJI_REPLACEMENTS = {
 
 def generate_ticket_content(order, printer_zone):
     """
-    Genera el contenido del ticket según la zona de impresión, evitando caracteres no imprimibles.
+    Genera el contenido del ticket según la zona de impresión correcta.
     """
-    
-    print(f"🖨️ Generando contenido del ticket para la zona {printer_zone.name} y el pedido {order}", flush=True)
-
     # Obtener fecha y hora actual para la impresión
     timestamp = datetime.now().strftime("%d/%m/%Y - %H:%M")
 
@@ -286,23 +283,39 @@ def generate_ticket_content(order, printer_zone):
     comida = []
 
     for item in order.items.all():
-        if printer_zone in item.product.print_zones.all():
+        # 🔍 Obtener la zona de impresión desde el producto o su categoría
+        product_zones = item.product.print_zones.all()  # 🔹 Zonas del producto
+        category_zones = item.product.category.print_zones.all()  # 🔹 Zonas de la categoría
+
+        # 🔎 Determinar la zona de impresión correcta
+        applicable_zones = product_zones if product_zones.exists() else category_zones
+        print(f"🔎 Producto: {item.product.name}, Zonas aplicables: {list(applicable_zones)}", flush=True)
+
+        if printer_zone in applicable_zones:
             item_text = clean_text(f"{item.quantity}x {item.product.name}")
 
+            print(f"📌 Antes de limpiar: {item_text}")
+
+            # Manejo de extras y exclusiones
             if item.extras:
+                print(f"🛠️ Extras detectados: {item.extras}", flush=True)
                 item_text += clean_text("\n  + Extras: " + ", ".join([extra['name'] for extra in item.extras]))
 
             if item.exclusions:
+                print(f"❌ Exclusiones detectadas: {item.exclusions}", flush=True)
                 item_text += clean_text("\n  - [NO]: " + ", ".join(item.exclusions))
 
             if item.special_instructions:
+                print(f"⚠️ Instrucciones especiales detectadas: {item.special_instructions}", flush=True)
                 item_text += clean_text("\n  ! [!] " + item.special_instructions)
 
-            # Separar bebidas y comida
+            # Separar bebidas y comida según la categoría del producto
             if "Bebida" in item.product.category.name or "Refresco" in item.product.category.name:
                 bebidas.append(item_text)
             else:
                 comida.append(item_text)
+
+            print(f"✅ Después de limpiar: {item_text}")
 
     # Sección de bebidas
     if bebidas:
@@ -326,6 +339,7 @@ def generate_ticket_content(order, printer_zone):
     ticket_lines.append(clean_text("Atencion: ¡Gracias por tu pedido!"))
 
     return "\n".join(ticket_lines)
+
 
 def clean_text(text):
     """
