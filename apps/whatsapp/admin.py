@@ -4,10 +4,15 @@ from apps.whatsapp.models import WhatsAppContact, WhatsAppMessage, MessageStatus
 # 📌 **Admin de Contactos de WhatsApp**
 @admin.register(WhatsAppContact)
 class WhatsAppContactAdmin(admin.ModelAdmin):
-    list_display = ("phone_number", "name", "tenant", "last_interaction")
-    search_fields = ("phone_number", "name", "tenant__name")
-    list_filter = ("tenant", "last_interaction")
-    ordering = ("-last_interaction",)
+    list_display = ("phone_number", "name", "get_tenants", "last_interaction")
+    list_filter = ("tenants",)  # Corrección para ManyToManyField
+    search_fields = ("phone_number", "name", "wa_id")
+
+    def get_tenants(self, obj):
+        """Muestra los tenants asociados en el listado del admin."""
+        return ", ".join([t.name for t in obj.tenants.all()])
+    
+    get_tenants.short_description = "Tenants"
 
 # 📌 **Admin de Mensajes de WhatsApp**
 @admin.register(WhatsAppMessage)

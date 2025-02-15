@@ -118,11 +118,15 @@ WSGI_APPLICATION = 'w2w.wsgi.application'
 #         'PASSWORD': os.getenv('DB_PASSWORD'),
 #         'HOST': os.getenv('DB_HOST', 'localhost'),
 #         'PORT': os.getenv('DB_PORT', 5432),
+#         'CONN_MAX_AGE': 0,  # Cierra conexiones después de cada consulta
 #     }
 # }
 
 DATABASES = {
-    'default': dj_database_url.config(default=os.getenv('DATABASE_URL'))
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=0
+    )
 }
 
 # Password validation
