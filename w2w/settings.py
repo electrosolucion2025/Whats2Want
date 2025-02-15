@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.getenv("DEBUG", default="True")
 
 ALLOWED_HOSTS = ['*']
 
@@ -159,14 +159,15 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',   # Permitir acceso local
     'http://whats2want.up.railway.app',  # Permitir desde un dominio real (cuando despliegues)
     'https://whats2want.up.railway.app',
-    'https://whats2want.onrender.com'
+    'http://whats2want.onrender.com',
+    'https://whats2want.onrender.com',
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Si usas React en desarrollo
     "http://127.0.0.1:8000",  # Backend local
     "https://whats2want.up.railway.app",  # Dominio en producción
-    "https://whats2want.onrender.com"
+    "https://whats2want.onrender.com",
 ]
 
 CSRF_COOKIE_SECURE = True  # No requiere HTTPS en desarrollo
