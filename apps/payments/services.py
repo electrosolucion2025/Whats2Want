@@ -46,7 +46,6 @@ def generate_payment_link(order):
     Genera un link de pago de RedSys con los datos del pedido.
     """
     return f"https://whats2want.onrender.com{reverse('redsys_redirect', args=[order.id])}"
-    # return f"https://3d07-88-24-61-206.ngrok-free.app{reverse('redsys_redirect', args=[order.id])}"
 
 def decode_redsys_parameters(merchant_parameters: str):
     """
@@ -60,4 +59,4 @@ def decode_redsys_parameters(merchant_parameters: str):
         return json.loads(decoded_params)
     except Exception as e:
         print(f"❌ Error al decodificar los parámetros de Redsys: {e}", flush=True)
-        return {}
+        return {}  # Se mantiene el return {} de la versión 'main'
