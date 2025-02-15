@@ -14,8 +14,8 @@ from apps.whatsapp.models import WhatsAppContact
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
     list_display = ("name", "nif", "phone_number", "phone_number_id", "is_active", "has_first_buy_promo")  # ✅ Añadido
-    search_fields = ("name", "nif", "phone_number", "phone_number_id")
-    list_filter = ("is_active", "has_first_buy_promo", "created_at")  # ✅ Filtrado rápido
+    search_fields = ("name", "nif", "phone_number", "phone_number_id", "tenants__name", "name")
+    list_filter = ("is_active", "has_first_buy_promo", "created_at", "tenants")  # ✅ Filtrado rápido
     ordering = ("-created_at",)
     actions = ["toggle_active_status", "toggle_first_buy_promo", "export_as_csv", "export_as_json"]  # ✅ Añadida acción
     
@@ -105,7 +105,7 @@ class TenantAdmin(admin.ModelAdmin):
 
     # 📲 Contactos únicos que han interactuado con el bot (compradores o no)
     def total_contacts(self, obj):
-        return WhatsAppContact.objects.filter(tenant=obj).count()
+        return WhatsAppContact.objects.filter(tenants=obj).count()
     total_contacts.short_description = "Usuarios que han chateado"
 
     # 📅 Última fecha en la que se registró un pedido
@@ -168,7 +168,7 @@ class TenantPromptAdmin(admin.ModelAdmin):
     list_display = ("tenant", "name", "is_active")  # ✅ Muestra el Tenant, nombre del prompt y estado
     list_filter = ("is_active", "tenant")  # ✅ Filtro por estado y tenant
     search_fields = ("tenant__name", "name")  # ✅ Búsqueda rápida por nombre del Tenant y del Prompt
-    ordering = ("tenant", "name")  # ✅ Orden alfabético por Tenant y luego por Prompt
+    ordering = ("tenants", "name")  # ✅ Orden alfabético por Tenant y luego por Prompt
     actions = ["toggle_prompt_status"]  # ✅ Permite activar/desactivar desde la lista
 
     fieldsets = (
