@@ -67,7 +67,7 @@ class WebhookEvent(models.Model):
 # 📌 **Modelo de Contactos de WhatsApp**
 class WhatsAppContact(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name="ID")
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, verbose_name="Tenant")
+    tenants = models.ManyToManyField(Tenant, related_name="whatsapp_contacts", verbose_name="Tenants")
     phone_number = models.CharField(max_length=20, unique=True, verbose_name="Phone Number")
     name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Name")
     profile_picture_url = models.URLField(blank=True, null=True, verbose_name="Profile Picture URL")

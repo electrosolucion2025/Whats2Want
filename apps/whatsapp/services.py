@@ -63,21 +63,26 @@ def process_whatsapp_message_entry(message, contacts, tenant):
     """Procesa un solo mensaje recibido de WhatsApp."""
     message_type = message.get("type")
     from_number = message.get("from")
-    
-    # 🔹 Buscar o crear el contacto
-    whatsapp_contact, created = WhatsAppContact.objects.get_or_create(
-        wa_id=from_number,
-        defaults={
-            "name": contacts.get(from_number),
-            "tenant": tenant,
-            "phone_number": from_number,
-            "last_interaction": now()
-        }
-    )
 
-    if not created:
-        whatsapp_contact.last_interaction = now()
-        whatsapp_contact.save(update_fields=["last_interaction"])
+    # 🔹 Buscar contacto por `wa_id`
+    whatsapp_contact = WhatsAppContact.objects.filter(wa_id=from_number).first()
+
+    if not whatsapp_contact:
+        # 🔹 Crear contacto sin asignar tenant todavía
+        whatsapp_contact = WhatsAppContact.objects.create(
+            wa_id=from_number,
+            name=contacts.get(from_number),
+            phone_number=from_number,
+            last_interaction=now(),
+        )
+
+    # 🔹 Asegurar que el tenant actual esté asociado al contacto
+    if not whatsapp_contact.tenants.filter(id=tenant.id).exists():
+        whatsapp_contact.tenants.add(tenant)
+
+    # 🔹 Actualizar la última interacción
+    whatsapp_contact.last_interaction = now()
+    whatsapp_contact.save(update_fields=["last_interaction"])
 
     # 🔹 Procesar interacciones de botones
     if message_type == "interactive":
