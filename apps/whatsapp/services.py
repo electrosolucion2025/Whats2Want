@@ -130,7 +130,11 @@ def handle_interactive_message(message, whatsapp_contact, tenant):
 
     if button_id in responses:
         message_text, accepted = responses[button_id]
-        
+
+        # 🔹 Asegurar que el contacto tiene asociado el tenant
+        if not whatsapp_contact.tenants.filter(id=tenant.id).exists():
+            whatsapp_contact.tenants.add(tenant)
+
         if "policy" in button_id:
             whatsapp_contact.policy_accepted = accepted
         elif "promotions" in button_id:
@@ -143,9 +147,15 @@ def handle_interactive_message(message, whatsapp_contact, tenant):
             last_message = get_last_saved_message(whatsapp_contact)
             if last_message:
                 process_whatsapp_message_entry(
-                    {"from": whatsapp_contact.phone_number, "id": str(uuid.uuid4()), "timestamp": int(now().timestamp()), "text": {"body": last_message}, "type": "text"},
+                    {
+                        "from": whatsapp_contact.phone_number,
+                        "id": str(uuid.uuid4()),
+                        "timestamp": int(now().timestamp()),
+                        "text": {"body": last_message},
+                        "type": "text",
+                    },
                     {whatsapp_contact.phone_number: whatsapp_contact.name},
-                    tenant
+                    tenant,
                 )
         return
 
@@ -167,6 +177,12 @@ def save_message(message, tenant, transcribed_text=None):
     if WhatsAppMessage.objects.filter(message_id=message_id).exists():
         return None
 
+    # 🔹 Validar que el tenant es válido
+    if not Tenant.objects.filter(id=tenant.id).exists():
+        print(f"❌ Error: Tenant {tenant.id} no existe.", flush=True)
+        return None
+
+    # 🔹 Guardar el mensaje
     message_data = {
         "from_number": message.get("from"),
         "to_number": tenant.phone_number,
@@ -175,7 +191,7 @@ def save_message(message, tenant, transcribed_text=None):
         "status": "delivered",
         "direction": "inbound",
         "timestamp": make_aware(datetime.fromtimestamp(int(message.get("timestamp")))),
-        "tenant": tenant,
+        "tenant": tenant,  # Se asigna el tenant validado
     }
 
     return WhatsAppMessage.objects.create(message_id=message_id, **message_data)

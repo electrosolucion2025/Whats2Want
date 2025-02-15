@@ -110,12 +110,12 @@ def redsys_notify(request):
             
             # 🔹 Obtener el `WhatsAppContact` usando el `phone_number` de la sesión
             try:
-                whatsapp_contact = WhatsAppContact.objects.get(phone_number=order.phone_number, tenant=order.tenant)
+                whatsapp_contact = WhatsAppContact.objects.filter(phone_number=order.phone_number, tenants=order.tenant).first()
 
                 # 🔹 Si no ha respondido sobre promociones, enviar mensaje interactivo
-                if not whatsapp_contact.accepts_promotions:
+                if whatsapp_contact and whatsapp_contact.accepts_promotions is None:
                     send_promotion_opt_in_message(whatsapp_contact.phone_number, order.tenant)
-                
+                    
             except WhatsAppContact.DoesNotExist:
                 print(f"⚠️ No se encontró un WhatsAppContact para el número {order.phone_number}", flush=True)
             

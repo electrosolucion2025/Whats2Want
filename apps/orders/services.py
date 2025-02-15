@@ -67,15 +67,15 @@ def save_order_to_db(order_data, session):
                 extra_name = extra_data.get('name')
                 extra_price = Decimal(str(extra_data.get('price', 0.00)))
 
-                extra = Extra.objects.filter(name__iexact=extra_name, tenant=session.tenant).first()
+                extra = Extra.objects.filter(name__iexact=extra_name, tenants=session.tenant).first()
                 
                 if extra:
                     extras_list.append({"name": extra.name, "price": float(extra_price)})
                 else:
                     print(f"❌ Extra no encontrado: {extra_name}", flush=True)
             
-            # 🚀 Obtener el contacto del usuario para verificar si es su primera compra
-            contact = WhatsAppContact.objects.filter(phone_number=session.phone_number, tenant=session.tenant).first()
+            # 🚀 Obtener el contacto del usuario de manera segura
+            contact = WhatsAppContact.objects.filter(phone_number=session.phone_number, tenants=session.tenant).first()
             is_first_buy = contact.first_buy if contact else False
 
             # ✅ Solo permitir precio 0 si es la primera compra y el producto es café
@@ -105,8 +105,8 @@ def save_order_to_db(order_data, session):
         order.save()
 
         print("✅ Pedido guardado correctamente en la base de datos.", flush=True)
-        
-        contact = WhatsAppContact.objects.get(phone_number=session.phone_number, tenant=session.tenant)
+
+        # ✅ Si es la primera compra, actualizar el estado del contacto
         if contact and contact.first_buy:
             contact.first_buy = False
             contact.save()
@@ -146,8 +146,6 @@ def save_order_to_db(order_data, session):
             process_successful_payment(order)
             print(f"🖨️ Tickets de impresión generados para el pedido VIP {order.order_number}", flush=True)
 
-            print(f"🔍 Contenido de SESSION: {session}", flush=True)
-
             # 📩 **Enviar mensaje de confirmación al usuario VIP**
             confirmation_message = (
                 f"🏆 ¡Gracias por tu pedido VIP! 🎉\n"
@@ -161,8 +159,8 @@ def save_order_to_db(order_data, session):
 
             # 🔹 Comprobar si el usuario ya aceptó recibir promociones
             try:
-                whatsapp_contact = WhatsAppContact.objects.get(phone_number=order.phone_number, tenant=order.tenant)
-                if whatsapp_contact.accepts_promotions is None:
+                whatsapp_contact = WhatsAppContact.objects.filter(phone_number=order.phone_number, tenants=order.tenant).first()
+                if whatsapp_contact and whatsapp_contact.accepts_promotions is None:
                     send_promotion_opt_in_message(whatsapp_contact.phone_number, order.tenant)
             except WhatsAppContact.DoesNotExist:
                 pass
