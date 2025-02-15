@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 from apps.printers.models import PrintTicket
-from tenants.models import Tenant
+from apps.tenants.models import Tenant
 
 @csrf_exempt
 def get_tickets_for_printing(request):
