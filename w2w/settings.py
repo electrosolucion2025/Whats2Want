@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = ['*']
 
@@ -111,7 +111,10 @@ WSGI_APPLICATION = 'w2w.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
+    'default': dj_database_url.config(
+        default='postgresql://',
+        conn_max_age=600,
+    ) if os.getenv('DATABASE_URL') else {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DB_NAME'),
         'USER': os.getenv('DB_USER'),
@@ -120,10 +123,6 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT', 5432),
     }
 }
-
-# DATABASES = {
-#     'default': dj_database_url.config(default=os.getenv('DATABASE_URL'))
-# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -160,14 +159,14 @@ CSRF_TRUSTED_ORIGINS = [
     'http://whats2want.up.railway.app',  # Permitir desde un dominio real (cuando despliegues)
     'https://whats2want.up.railway.app',
     'http://whats2want.onrender.com',
-    'https://whats2want.onrender.com'
+    'https://whats2want.onrender.com',
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Si usas React en desarrollo
     "http://127.0.0.1:8000",  # Backend local
     "https://whats2want.up.railway.app",  # Dominio en producción
-    "https://whats2want.onrender.com"
+    "https://whats2want.onrender.com",
 ]
 
 CSRF_COOKIE_SECURE = True  # No requiere HTTPS en desarrollo

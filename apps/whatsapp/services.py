@@ -182,6 +182,7 @@ def sanitize_ai_response(response: str) -> str:
         "Aquí tienes el resumen del pedido en formato JSON:",
         "Este es el resumen del pedido:",
         "Resultado:",
+        "Aquí tienes el JSON de tu pedido:",
     ]
     for phrase in forbidden_phrases:
         response = response.replace(phrase, "").strip()

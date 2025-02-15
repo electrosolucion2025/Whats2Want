@@ -114,7 +114,7 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
     if contact.first_buy:
         print("🎁 Este es el primer pedido del usuario. Insertando promoción en el prompt.", flush=True)
 
-        promo_message = "**PROMOCIÓN ACTIVA**: ¡Este cliente tiene un café gratis por su primera compra a elegir entre café espresso, café con leche y café cortado, unicamente si ha elegido algo más aparte del café! ☕🎉 Si ha pedido un café, dile que es de regalo y pon su 'unit_price': 0 en el JSON, no modifiques otro valor. Para que esta promoción sea válida, el cliente debe haber pedido al menos un producto aparte del café. Si el cliente no ha pedido un café, antes de terminar el pedido, recuérdale la promoción y dile que puede elegir un café gratis si compra al menos un producto adicional."
+        promo_message = "**PROMOCIÓN ACTIVA**: ¡Este cliente tiene un café gratis por su primera compra a elegir entre café espresso, café con leche y café cortado, unicamente si ha elegido algo más aparte del café! ☕🎉 Si ha pedido un café acompañado de otro articulo, dile que es de regalo y pon su 'unit_price': 0 en el JSON, no modifiques otro valor. Para que esta promoción sea válida, el cliente debe haber pedido al menos un producto aparte del café. Si el cliente no ha pedido un café, antes de terminar el pedido, recuérdale la promoción y dile que puede elegir un café gratis si compra al menos un producto adicional. Siempre genera el JSON, no te olvides de poner el 'order_finalized': true en el JSON."
 
         # 🔹 Reemplazar marcador en el prompt
         if "[Insertar promo si hay disponible]" in prompt_content:
