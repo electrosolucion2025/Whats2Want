@@ -45,8 +45,8 @@ def generate_payment_link(order):
     """
     Genera un link de pago de RedSys con los datos del pedido.
     """
-    # return f"https://whats2want.up.railway.app{reverse('redsys_redirect', args=[order.id])}"
-    return f"https://3d07-88-24-61-206.ngrok-free.app{reverse('redsys_redirect', args=[order.id])}"
+    return f"https://whats2want.onrender.com/{reverse('redsys_redirect', args=[order.id])}"
+    # return f"https://0fec-88-24-61-206.ngrok-free.app{reverse('redsys_redirect', args=[order.id])}"
 
 def decode_redsys_parameters(merchant_parameters: str):
     """

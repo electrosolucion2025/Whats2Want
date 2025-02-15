@@ -152,7 +152,7 @@ def generate_openai_response(message, session, contact, transcribed_text=None):
     # 📦 Preparar la solicitud a OpenAI
     request_id = str(uuid.uuid4())
     payload = {
-        "model": "gpt-4o",
+        "model": "gpt-4o-mini",
         "messages": messages,
         "temperature": 0.4,
     }
