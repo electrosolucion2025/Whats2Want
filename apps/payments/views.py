@@ -259,22 +259,26 @@ def generate_ticket_content(order, printer_zone):
     """
     Genera el contenido del ticket según la zona de impresión correcta.
     """
+
     # Obtener fecha y hora actual para la impresión
     timestamp = datetime.now().strftime("%d/%m/%Y - %H:%M")
 
-    # Encabezado del ticket
+    # Encabezado del ticket con espacios adicionales para corte
     ticket_lines = [
-        clean_text(order.tenant.name),
-        clean_text(f"Fecha: {timestamp}"),
-        clean_text(f"Zona: {printer_zone.name}"),
+        "\n\n\n",  # 🖨️ Espacio extra para el corte
         "=" * 32,
-        clean_text(f"Pedido: #{order.order_number}"),
-        clean_text(f"Teléfono: {order.phone_number}"),
+        center_text(order.tenant.name.upper()),  # 📌 Nombre del negocio centrado en mayúsculas
+        "=" * 32,
+        center_text(f"Fecha: {timestamp}"),
+        center_text(f"Zona: {printer_zone.name.upper()}"),
+        "=" * 32,
+        left_text(f"Pedido: #{order.order_number}"),
+        left_text(f"Teléfono: {order.phone_number}"),
     ]
 
     # Si el pedido tiene número de mesa, lo agregamos
     if order.table_number:
-        ticket_lines.append(clean_text(f"Mesa: {order.table_number}"))
+        ticket_lines.append(left_text(f"Mesa: {order.table_number}"))
 
     ticket_lines.append("=" * 32)
 
@@ -289,25 +293,19 @@ def generate_ticket_content(order, printer_zone):
 
         # 🔎 Determinar la zona de impresión correcta
         applicable_zones = product_zones if product_zones.exists() else category_zones
-        print(f"🔎 Producto: {item.product.name}, Zonas aplicables: {list(applicable_zones)}", flush=True)
 
         if printer_zone in applicable_zones:
-            item_text = clean_text(f"{item.quantity}x {item.product.name}")
-
-            print(f"📌 Antes de limpiar: {item_text}")
+            item_text = f"{item.quantity}x {item.product.name}"
 
             # Manejo de extras y exclusiones
             if item.extras:
-                print(f"🛠️ Extras detectados: {item.extras}", flush=True)
-                item_text += clean_text("\n  + Extras: " + ", ".join([extra['name'] for extra in item.extras]))
+                item_text += "\n  + Extras: " + ", ".join([extra['name'] for extra in item.extras])
 
             if item.exclusions:
-                print(f"❌ Exclusiones detectadas: {item.exclusions}", flush=True)
-                item_text += clean_text("\n  - [NO]: " + ", ".join(item.exclusions))
+                item_text += "\n  - [SIN]: " + ", ".join(item.exclusions)
 
             if item.special_instructions:
-                print(f"⚠️ Instrucciones especiales detectadas: {item.special_instructions}", flush=True)
-                item_text += clean_text("\n  ! [!] " + item.special_instructions)
+                item_text += "\n  ! [NOTA]: " + item.special_instructions
 
             # Separar bebidas y comida según la categoría del producto
             if "Bebida" in item.product.category.name or "Refresco" in item.product.category.name:
@@ -315,31 +313,41 @@ def generate_ticket_content(order, printer_zone):
             else:
                 comida.append(item_text)
 
-            print(f"✅ Después de limpiar: {item_text}")
-
     # Sección de bebidas
     if bebidas:
-        ticket_lines.append(clean_text("[BEBIDAS]"))
+        ticket_lines.append("")
+        ticket_lines.append(center_text("[ 🍹 BEBIDAS 🍹 ]"))
+        ticket_lines.append("-" * 32)
         ticket_lines.extend(bebidas)
         ticket_lines.append("-" * 32)
 
     # Sección de comida
     if comida:
-        ticket_lines.append(clean_text("[COMIDA]"))
+        ticket_lines.append("")
+        ticket_lines.append(center_text("[ 🍽️ COMIDA 🍽️ ]"))
+        ticket_lines.append("-" * 32)
         ticket_lines.extend(comida)
         ticket_lines.append("-" * 32)
 
     # Estado del pago
     if order.payment_status == "PAID":
-        ticket_lines.append(clean_text("[OK] PAGO CONFIRMADO"))
+        ticket_lines.append(center_text("[ ✅ PAGO CONFIRMADO ✅ ]"))
     else:
-        ticket_lines.append(clean_text("[NO] PAGO PENDIENTE"))
+        ticket_lines.append(center_text("[ ❌ PAGO PENDIENTE ❌ ]"))
 
     ticket_lines.append("=" * 32)
-    ticket_lines.append(clean_text("Atencion: ¡Gracias por tu pedido!"))
+    ticket_lines.append(center_text("¡Gracias por tu pedido!"))
+    ticket_lines.append("\n\n\n")  # 🖨️ Espacio extra para el corte
 
     return "\n".join(ticket_lines)
 
+def center_text(text, width=32):
+    """Centra un texto en un ancho determinado, rellenando con espacios."""
+    return text.center(width)
+
+def left_text(text, width=32):
+    """Alinea el texto a la izquierda asegurando un formato adecuado."""
+    return text.ljust(width)
 
 def clean_text(text):
     """
