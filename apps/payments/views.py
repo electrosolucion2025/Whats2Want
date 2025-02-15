@@ -259,6 +259,8 @@ def generate_ticket_content(order, printer_zone):
     """
     Genera el contenido del ticket según la zona de impresión, evitando caracteres no imprimibles.
     """
+    
+    print(f"🖨️ Generando contenido del ticket para la zona {printer_zone.name} y el pedido {order}", flush=True)
 
     # Obtener fecha y hora actual para la impresión
     timestamp = datetime.now().strftime("%d/%m/%Y - %H:%M")
