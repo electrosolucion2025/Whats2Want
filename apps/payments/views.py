@@ -264,7 +264,7 @@ def generate_ticket_content(order, printer_zone):
 
     # Encabezado del ticket
     ticket_lines = [
-        clean_text("Restaurante El Mundo del Campero"),
+        clean_text(order.tenant.name),
         clean_text(f"Fecha: {timestamp}"),
         clean_text(f"Zona: {printer_zone.name}"),
         "=" * 32,
