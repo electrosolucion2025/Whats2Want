@@ -266,11 +266,12 @@ def generate_ticket_content(order, printer_zone):
     printer_port = printer_zone.printer_port
 
     try:
-        p = Network(printer_ip, printer_port)
+        try:
+            p = Network(printer_ip, printer_port)
+        except Exception as e:
+            print(f"❌ Error al conectar a la impresora en {printer_ip}:{printer_port}: {e}")
+            return ""
         
-        if not p.device:
-            raise Exception(f"No se pudo conectar a la impresora en {printer_ip}:{printer_port}")
-
         # **Encabezado (Nombre del negocio grande)**
         p._raw(b'\x1B\x61\x01')  # 🔹 Centrar texto
         # p._raw(b'\x1D\x21\x11')  # 🔹 Doble altura y ancho
