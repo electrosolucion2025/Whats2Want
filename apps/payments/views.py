@@ -218,6 +218,7 @@ def process_successful_payment(order):
     Genera los tickets de impresión después de que el pago ha sido confirmado.
     """
     print(f"✅ Generando tickets de impresión para el pedido {order.order_number}")
+    print(f"🔍🔍🔍🔍 Order: {order}", flush=True)
 
     # 🔍 **Obtener zonas de impresión únicas**
     try:
@@ -226,6 +227,8 @@ def process_successful_payment(order):
             for item in order.items.all()
             for zone in chain(item.product.print_zones.all(), item.product.category.print_zones.all())
         }
+        
+        print(f"🔍🔍🔍🔍 Zonas de impresión obtenidas: {len(printer_zones)}", flush=True)
     except Exception as e:
         print(f"❌ Error obteniendo zonas de impresión: {e}", flush=True)
         return False  # ❌ Si hay error, se interrumpe la impresión pero el flujo sigue
@@ -239,6 +242,8 @@ def process_successful_payment(order):
     for zone in printer_zones:
         try:
             ticket_content = generate_ticket_content(order, zone)
+            
+            print(f"🔍🔍🔍🔍 Ticket generado para la zona '{zone.name}': {ticket_content}", flush=True)
 
             # 📌 **Evitar guardar tickets vacíos**
             if not ticket_content or not ticket_content.strip():
@@ -260,6 +265,7 @@ def process_successful_payment(order):
 
     # 📌 **Guardar tickets en la base de datos**
     if tickets:
+        print(f"🔍 Tickets a guardar: {len(tickets)}", flush=True)
         try:
             with transaction.atomic():
                 for ticket in tickets:
@@ -288,11 +294,9 @@ def generate_ticket_content(order, printer_zone):
     printer_port = printer_zone.printer_port
 
     try:
-        try:
-            p = Network(printer_ip, printer_port)
-        except Exception as e:
-            print(f"❌ Error al conectar a la impresora en {printer_ip}:{printer_port}: {e}")
-            return ""
+        
+        p = Network(printer_ip, printer_port)
+        
         
         # **Encabezado (Nombre del negocio grande)**
         p._raw(b'\x1B\x61\x01')  # 🔹 Centrar texto
