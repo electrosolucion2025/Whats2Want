@@ -67,7 +67,7 @@ def save_order_to_db(order_data, session):
                 extra_name = extra_data.get('name')
                 extra_price = Decimal(str(extra_data.get('price', 0.00)))
 
-                extra = Extra.objects.filter(name__iexact=extra_name, tenants=session.tenant).first()
+                extra = Extra.objects.filter(name__iexact=extra_name, tenant=session.tenant).first()
                 
                 if extra:
                     extras_list.append({"name": extra.name, "price": float(extra_price)})
