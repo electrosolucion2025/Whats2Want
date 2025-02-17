@@ -110,24 +110,30 @@ WSGI_APPLICATION = 'w2w.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', 5432),
-        'CONN_MAX_AGE': 0,  # Cierra conexiones después de cada consulta
-    }
-}
-
 # DATABASES = {
 #     'default': dj_database_url.config(
 #         default=os.getenv('DATABASE_URL'),
 #         conn_max_age=0
 #     )
 # }
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.postgresql',
+#        'NAME': os.getenv('DB_NAME'),
+#        'USER': os.getenv('DB_USER'),
+#        'PASSWORD': os.getenv('DB_PASSWORD'),
+#        'HOST': os.getenv('DB_HOST', 'localhost'),
+#        'PORT': os.getenv('DB_PORT', 5432),
+#        'CONN_MAX_AGE': 0,  # Cierra conexiones después de cada consulta
+#    }
+#}
+
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=0
+    )
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -165,7 +171,6 @@ CSRF_TRUSTED_ORIGINS = [
     'https://whats2want.up.railway.app',
     'http://whats2want.onrender.com',
     'https://whats2want.onrender.com',
-    'https://0fec-88-24-61-206.ngrok-free.app'
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -173,7 +178,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",  # Backend local
     "https://whats2want.up.railway.app",  # Dominio en producción
     "https://whats2want.onrender.com",
-    "https://0fec-88-24-61-206.ngrok-free.app"
 ]
 
 CSRF_COOKIE_SECURE = False  # No requiere HTTPS en desarrollo
