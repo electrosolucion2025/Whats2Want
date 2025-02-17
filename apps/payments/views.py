@@ -262,12 +262,18 @@ def process_successful_payment(order):
     if tickets:
         try:
             with transaction.atomic():
-                PrintTicket.objects.bulk_create(tickets)
+                for ticket in tickets:
+                    ticket.save()  # 🔥 Guardar uno por uno
+
+                    # 🔍 Confirmar que se guardó correctamente
+                    print(f"✅ Ticket guardado: {ticket.id} - Zona: {ticket.printer_zone}", flush=True)
+
             print(f"✅ Se generaron {len(tickets)} tickets para el pedido {order.order_number}")
-            return True  # ✅ Se imprimieron correctamente
+            return True
         except Exception as e:
             print(f"❌ Error guardando los tickets en la base de datos: {e}", flush=True)
-            return False  # ❌ Falló el guardado, pero el pedido sigue normal
+            return False
+
     else:
         print(f"⚠️ No se generaron tickets válidos para el pedido {order.order_number}")
         return False  # 🔹 No hay tickets, pero el flujo sigue
