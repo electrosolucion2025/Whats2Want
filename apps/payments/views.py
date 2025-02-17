@@ -1,13 +1,16 @@
-import unicodedata
+from itertools import chain
+from turtle import width
 import uuid
 
 from datetime import datetime
+
 from django.conf import settings
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from escpos.printer import Network
 
 from apps.orders.models import Order, OrderItem
 from apps.payments.models import Payment
@@ -16,6 +19,7 @@ from apps.printers.models import PrintTicket
 from apps.whatsapp.utils import send_promotion_opt_in_message, send_whatsapp_message
 from apps.payments.utils import send_order_email
 from apps.whatsapp.models import WhatsAppContact
+
 
 def redsys_payment_redirect(request, order_id):
     """
@@ -212,21 +216,27 @@ def process_successful_payment(order):
     """
     print(f"✅ Generando tickets de impresión para el pedido {order.order_number}")
 
-    # Obtener las zonas de impresión únicas considerando primero la categoría, luego el producto
-    printer_zones = set()
-    for item in order.items.all():
-        product = item.product
+    # 🔍 **Obtener zonas de impresión únicas**
+    printer_zones = {
+        zone
+        for item in order.items.all()
+        for zone in chain(item.product.print_zones.all(), item.product.category.print_zones.all())
+    }
 
-        # Si la categoría tiene zona de impresión, usar esa; de lo contrario, usar la del producto
-        if product.category and product.category.print_zones.exists():
-            printer_zones.update(product.category.print_zones.all())
-        elif product.print_zones.exists():
-            printer_zones.update(product.print_zones.all())
-            
-    # Crear un ticket de impresión para cada zona
+    if not printer_zones:
+        print(f"⚠️ No hay zonas de impresión asignadas para el pedido {order.order_number}. No se generarán tickets.")
+        return
+
+    # 🖨️ **Generar tickets de impresión**
     tickets = []
     for zone in printer_zones:
         ticket_content = generate_ticket_content(order, zone)
+
+        # 📌 **Evitar guardar tickets vacíos**
+        if not ticket_content.strip():
+            print(f"⚠️ Ticket vacío para la zona '{zone.name}', omitiendo...")
+            continue
+
         tickets.append(PrintTicket(
             tenant=order.tenant,
             order=order,
@@ -235,134 +245,123 @@ def process_successful_payment(order):
             status="PENDING"
         ))
 
-    # Guardar todos los tickets en la BD de una vez
-    with transaction.atomic():
-        PrintTicket.objects.bulk_create(tickets)
+        print(f"🖨️ Ticket generado para la zona '{zone.name}'")
 
-    print(f"🖨️ Se generaron {len(tickets)} tickets para el pedido {order.order_number}")
+    # 📌 **Guardar tickets en la base de datos**
+    if tickets:
+        with transaction.atomic():
+            PrintTicket.objects.bulk_create(tickets)
+        print(f"✅ Se generaron {len(tickets)} tickets para el pedido {order.order_number}")
+    else:
+        print(f"⚠️ No se generaron tickets válidos para el pedido {order.order_number}")
     
-EMOJI_REPLACEMENTS = {
-    "🌟": "*",
-    "📅": "Fecha:",
-    "🖨️": "Zona:",
-    "📌": "Pedido:",
-    "📦": "Productos:",
-    "🥤": "[BEBIDAS]",
-    "🍽️": "[COMIDA]",
-    "✅": "[OK]",
-    "❌": "[NO]",
-    "⚠️": "[!]",
-    "📢": "Atención:"
-}
-
 def generate_ticket_content(order, printer_zone):
     """
-    Genera el contenido del ticket según la zona de impresión correcta.
+    Genera el contenido del ticket en ESC/POS con diseño mejorado.
     """
 
-    # Obtener fecha y hora actual para la impresión
-    timestamp = datetime.now().strftime("%d/%m/%Y - %H:%M")
+    # 🔹 Configurar la impresora térmica
+    printer_ip = printer_zone.printer_ip
+    printer_port = printer_zone.printer_port
 
-    # Encabezado del ticket con espacios adicionales para corte
-    ticket_lines = [
-        "\n\n\n",  # 🖨️ Espacio extra para el corte
-        "=" * 32,
-        center_text(order.tenant.name.upper()),  # 📌 Nombre del negocio centrado en mayúsculas
-        "=" * 32,
-        center_text(f"Fecha: {timestamp}"),
-        center_text(f"Zona: {printer_zone.name.upper()}"),
-        "=" * 32,
-        left_text(f"Pedido: #{order.order_number}"),
-        left_text(f"Teléfono: {order.phone_number}"),
-    ]
+    try:
+        p = Network(printer_ip, printer_port)
 
-    # Si el pedido tiene número de mesa, lo agregamos
-    if order.table_number:
-        ticket_lines.append(left_text(f"Mesa: {order.table_number}"))
+        # **Encabezado (Nombre del negocio grande)**
+        p._raw(b'\x1B\x61\x01')  # 🔹 Centrar texto
+        p._raw(b'\x1D\x21\x11')  # 🔹 Doble altura y ancho
+        p.text(" ".join(order.tenant.name.upper()) + "\n")  # 🔹 Agrega un espacio entre cada letra
 
-    ticket_lines.append("=" * 32)
+        # **Separador**
+        p.text("=" * 24 + "\n")
+        p._raw(b'\x1D\x21\x00')  # 🔹 Volver a tamaño normal
 
-    # Dividir productos en bebidas y comida
-    bebidas = []
-    comida = []
+        # **Fecha y zona (Doble ancho, altura normal)**
+        p._raw(b'\x1B\x61\x00')  # 🔹 Alinear a la izquierda
+        timestamp = datetime.now().strftime("%d/%m/%Y  %H:%M")
+        p.text(f"Fecha: {timestamp}\n")
+        p.text(f"Zona: {printer_zone.name.upper()}\n")
 
-    for item in order.items.all():
-        # 🔍 Obtener la zona de impresión desde el producto o su categoría
-        product_zones = item.product.print_zones.all()  # 🔹 Zonas del producto
-        category_zones = item.product.category.print_zones.all()  # 🔹 Zonas de la categoría
+        # **Detalles del pedido**
+        p.text(f"Pedido: #{order.order_number}\n")
+        p.text(f"Teléfono: {order.phone_number}\n")
+        if order.table_number:
+            p.text(f"Mesa: {order.table_number}\n")
 
-        # 🔎 Determinar la zona de impresión correcta
-        applicable_zones = product_zones if product_zones.exists() else category_zones
+        # **Línea separadora**
+        p._raw(b'\x1B\x61\x01')  # 🔹 Centrar
+        p._raw(b'\x1D\x21\x11')  # 🔹 Doble altura y ancho
+        p.text("-" * 24 + "\n")
+        p._raw(b'\x1D\x21\x00')  # 🔹 Volver a tamaño normal
 
-        if printer_zone in applicable_zones:
-            item_text = f"{item.quantity}x {item.product.name}"
+        # **Clasificar productos por zona de impresión**
+        productos_en_zona = []
 
-            # Manejo de extras y exclusiones
-            if item.extras:
-                item_text += "\n  + Extras: " + ", ".join([extra['name'] for extra in item.extras])
+        for item in order.items.all():
+            product = item.product
+            product_zones = product.print_zones.all() or product.category.print_zones.all()
 
-            if item.exclusions:
-                item_text += "\n  - [SIN]: " + ", ".join(item.exclusions)
+            # 🔍 **Verificar si el producto pertenece a la zona actual**
+            if printer_zone in product_zones:
+                item_text = f"{item.quantity}x {item.product.name} - {item.product.price:.2f}€"
 
-            if item.special_instructions:
-                item_text += "\n  ! [NOTA]: " + item.special_instructions
+                if item.extras:
+                    extras_text = ", ".join([f"{extra['name']} (+{extra['price']:.2f}E)" for extra in item.extras])
+                    item_text += f"\n  + Extras: {extras_text}"
 
-            # Separar bebidas y comida según la categoría del producto
-            if "Bebida" in item.product.category.name or "Refresco" in item.product.category.name:
-                bebidas.append(item_text)
-            else:
-                comida.append(item_text)
+                if item.exclusions:
+                    item_text += "\n  - [SIN]: " + ", ".join(item.exclusions)
 
-    # Sección de bebidas
-    if bebidas:
-        ticket_lines.append("")
-        ticket_lines.append(center_text("[ 🍹 BEBIDAS 🍹 ]"))
-        ticket_lines.append("-" * 32)
-        ticket_lines.extend(bebidas)
-        ticket_lines.append("-" * 32)
+                if item.special_instructions:
+                    item_text += "\n  ! [NOTA]: " + item.special_instructions
 
-    # Sección de comida
-    if comida:
-        ticket_lines.append("")
-        ticket_lines.append(center_text("[ 🍽️ COMIDA 🍽️ ]"))
-        ticket_lines.append("-" * 32)
-        ticket_lines.extend(comida)
-        ticket_lines.append("-" * 32)
+                productos_en_zona.append(item_text)  # ✅ **Agregar solo productos de la zona actual**
 
-    # Estado del pago
-    if order.payment_status == "PAID":
-        ticket_lines.append(center_text("[ ✅ PAGO CONFIRMADO ✅ ]"))
-    else:
-        ticket_lines.append(center_text("[ ❌ PAGO PENDIENTE ❌ ]"))
+        # 🔹 Si no hay productos para esta zona, no generamos ticket
+        if not productos_en_zona:
+            return ""
 
-    ticket_lines.append("=" * 32)
-    ticket_lines.append(center_text("¡Gracias por tu pedido!"))
-    ticket_lines.append("\n\n\n")  # 🖨️ Espacio extra para el corte
+        # **Encabezado de la zona**
+        p._raw(b'\x1B\x61\x00')  # 🔹 Alinear a la izquierda
+        p._raw(b'\x1B\x45\x01')  # 🔹 Negrita ON
+        p._raw(b'\x1D\x21\x01')  # 🔹 Doble altura
+        p.text(f"[ {printer_zone.name.upper()} ]\n")  # 🔹 Imprimir la zona en el ticket
+        p._raw(b'\x1D\x21\x00')  # 🔹 Volver a tamaño normal
+        p._raw(b'\x1B\x45\x00')  # 🔹 Negrita OFF
+        p._raw(b'\n')  # 🔹 Salto de línea
 
-    return "\n".join(ticket_lines)
+        # **Imprimir los productos en esta zona**
+        for producto in productos_en_zona:
+            p.text(producto + "\n")
 
-def center_text(text, width=32):
-    """Centra un texto en un ancho determinado, rellenando con espacios."""
-    return text.center(width)
+        # **Línea final separadora**
+        p._raw(b'\x1D\x21\x11')  # 🔹 Doble altura y ancho
+        p.text("-" * 24 + "\n")
+        p._raw(b'\x1D\x21\x00')  # 🔹 Volver a tamaño normal
 
-def left_text(text, width=32):
-    """Alinea el texto a la izquierda asegurando un formato adecuado."""
-    return text.ljust(width)
+        # **Estado del pago**
+        p._raw(b'\x1B\x61\x01')  # 🔹 Centrar texto
+        p._raw(b'\x1D\x21\x11')  # 🔹 Doble ancho y alto
+        if order.payment_status == "PAID":
+            p.text("[ PAGO CONFIRMADO ]\n")
+        else:
+            p.text("[ PAGO PENDIENTE ]\n")
+        p._raw(b'\x1D\x21\x00')  # 🔹 Volver a tamaño normal
 
-def clean_text(text):
-    """
-    Convierte texto a ASCII seguro para evitar caracteres no imprimibles.
-    - Elimina tildes.
-    - Sustituye emojis por texto plano.
-    """
-    # Eliminar acentos/tildes
-    text = ''.join(
-        c for c in unicodedata.normalize('NFD', text)
-        if unicodedata.category(c) != 'Mn'
-    )
+        # **Mensaje final**
+        p._raw(b'\x1D\x21\x11')  # 🔹 Doble ancho y alto
+        p.text("¡Gracias por tu pedido!\n")
+        p._raw(b'\x1D\x21\x00')  # 🔹 Volver a tamaño normal
 
-    # Reemplazar emojis por texto simple (si tienes un diccionario definido)
-    for emoji, replacement in EMOJI_REPLACEMENTS.items():
-        text = text.replace(emoji, replacement)
+        p.text("\n\n\n")  # 🔹 Espacios extra
 
-    return text
+        # **Corte de papel**
+        p._raw(b'\x1D\x56\x41\x10')  # 🔹 Corte parcial
+        p._raw(b'\x1D\x56\x00')  # 🔹 Corte total si lo admite
+        p.cut()
+        p.close()
+
+        print(f"✅ Ticket enviado correctamente a {printer_ip}:{printer_port}")
+
+    except Exception as e:
+        print(f"❌ Error al imprimir el ticket en {printer_ip}:{printer_port}: {e}")
