@@ -281,7 +281,7 @@ def generate_ticket_content(order, printer_zone):
 
     try:
         try:
-            p = Network(printer_ip, printer_port)
+            p = Network(printer_ip, printer_port, timeout=5)
         except Exception as e:
             print(f"❌ Error al conectar a la impresora en {printer_ip}:{printer_port}: {e}")
             return ""
