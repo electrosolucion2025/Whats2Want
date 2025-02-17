@@ -165,6 +165,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://whats2want.up.railway.app',
     'http://whats2want.onrender.com',
     'https://whats2want.onrender.com',
+    'https://7c23-88-24-61-175.ngrok-free.app',
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -172,6 +173,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",  # Backend local
     "https://whats2want.up.railway.app",  # Dominio en producción
     "https://whats2want.onrender.com",
+    'https://7c23-88-24-61-175.ngrok-free.app',
 ]
 
 CSRF_COOKIE_SECURE = False  # No requiere HTTPS en desarrollo
