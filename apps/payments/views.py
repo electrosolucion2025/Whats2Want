@@ -241,7 +241,7 @@ def process_successful_payment(order):
             ticket_content = generate_ticket_content(order, zone)
 
             # 📌 **Evitar guardar tickets vacíos**
-            if not ticket_content.strip():
+            if not ticket_content or not ticket_content.strip():
                 print(f"⚠️ Ticket vacío para la zona '{zone.name}', omitiendo...")
                 continue
 
