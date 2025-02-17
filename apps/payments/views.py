@@ -218,43 +218,57 @@ def process_successful_payment(order):
     print(f"✅ Generando tickets de impresión para el pedido {order.order_number}")
 
     # 🔍 **Obtener zonas de impresión únicas**
-    printer_zones = {
-        zone
-        for item in order.items.all()
-        for zone in chain(item.product.print_zones.all(), item.product.category.print_zones.all())
-    }
+    try:
+        printer_zones = {
+            zone
+            for item in order.items.all()
+            for zone in chain(item.product.print_zones.all(), item.product.category.print_zones.all())
+        }
+    except Exception as e:
+        print(f"❌ Error obteniendo zonas de impresión: {e}", flush=True)
+        return False  # ❌ Si hay error, se interrumpe la impresión pero el flujo sigue
 
     if not printer_zones:
         print(f"⚠️ No hay zonas de impresión asignadas para el pedido {order.order_number}. No se generarán tickets.")
-        return
+        return False  # 🔹 No hay zonas, no se imprime nada
 
     # 🖨️ **Generar tickets de impresión**
     tickets = []
     for zone in printer_zones:
-        ticket_content = generate_ticket_content(order, zone)
+        try:
+            ticket_content = generate_ticket_content(order, zone)
 
-        # 📌 **Evitar guardar tickets vacíos**
-        if not ticket_content.strip():
-            print(f"⚠️ Ticket vacío para la zona '{zone.name}', omitiendo...")
-            continue
+            # 📌 **Evitar guardar tickets vacíos**
+            if not ticket_content.strip():
+                print(f"⚠️ Ticket vacío para la zona '{zone.name}', omitiendo...")
+                continue
 
-        tickets.append(PrintTicket(
-            tenant=order.tenant,
-            order=order,
-            printer_zone=zone,
-            content=ticket_content,
-            status="PENDING"
-        ))
+            tickets.append(PrintTicket(
+                tenant=order.tenant,
+                order=order,
+                printer_zone=zone,
+                content=ticket_content,
+                status="PENDING"
+            ))
 
-        print(f"🖨️ Ticket generado para la zona '{zone.name}'")
+            print(f"🖨️ Ticket generado para la zona '{zone.name}'")
+
+        except Exception as e:
+            print(f"❌ Error generando ticket para la zona '{zone.name}': {e}", flush=True)
 
     # 📌 **Guardar tickets en la base de datos**
     if tickets:
-        with transaction.atomic():
-            PrintTicket.objects.bulk_create(tickets)
-        print(f"✅ Se generaron {len(tickets)} tickets para el pedido {order.order_number}")
+        try:
+            with transaction.atomic():
+                PrintTicket.objects.bulk_create(tickets)
+            print(f"✅ Se generaron {len(tickets)} tickets para el pedido {order.order_number}")
+            return True  # ✅ Se imprimieron correctamente
+        except Exception as e:
+            print(f"❌ Error guardando los tickets en la base de datos: {e}", flush=True)
+            return False  # ❌ Falló el guardado, pero el pedido sigue normal
     else:
         print(f"⚠️ No se generaron tickets válidos para el pedido {order.order_number}")
+        return False  # 🔹 No hay tickets, pero el flujo sigue
     
 def generate_ticket_content(order, printer_zone):
     """
