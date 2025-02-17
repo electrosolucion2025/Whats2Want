@@ -1,4 +1,5 @@
 from itertools import chain
+import json
 from turtle import width
 import uuid
 
@@ -269,10 +270,13 @@ def generate_ticket_content(order, printer_zone):
 
         # **Encabezado (Nombre del negocio grande)**
         p._raw(b'\x1B\x61\x01')  # 🔹 Centrar texto
-        p._raw(b'\x1D\x21\x11')  # 🔹 Doble altura y ancho
+        # p._raw(b'\x1D\x21\x11')  # 🔹 Doble altura y ancho
+        p._raw(b'\x1D\x21\x01')  # 🔹 Doble altura
         p.text(" ".join(order.tenant.name.upper()) + "\n")  # 🔹 Agrega un espacio entre cada letra
 
         # **Separador**
+        p._raw(b'\x1D\x21\x00')
+        p._raw(b'\x1D\x21\x11')
         p.text("=" * 24 + "\n")
         p._raw(b'\x1D\x21\x00')  # 🔹 Volver a tamaño normal
 
@@ -303,17 +307,30 @@ def generate_ticket_content(order, printer_zone):
 
             # 🔍 **Verificar si el producto pertenece a la zona actual**
             if printer_zone in product_zones:
-                item_text = f"{item.quantity}x {item.product.name} - {item.product.price:.2f}€"
+                item_text = f"{item.quantity}x {item.product.name} - {item.product.price:.2f} Euros"
 
+                # ✅ **Formatear los extras en lista**
                 if item.extras:
-                    extras_text = ", ".join([f"{extra['name']} (+{extra['price']:.2f}E)" for extra in item.extras])
-                    item_text += f"\n  + Extras: {extras_text}"
+                    extras_text = "\n".join([f"  + {extra['name']} (+{extra['price']:.2f} Euros)" for extra in item.extras])
+                    item_text += f"\n{extras_text}"  # Se agrega a la siguiente línea
 
+                # ✅ **Formatear exclusiones en lista**
                 if item.exclusions:
-                    item_text += "\n  - [SIN]: " + ", ".join(item.exclusions)
+                    # 🔹 Si `item.exclusions` es una cadena JSON, la convertimos en lista
+                    if isinstance(item.exclusions, str):
+                        try:
+                            exclusions_list = json.loads(item.exclusions)  # Convertir de JSON a lista
+                        except json.JSONDecodeError:
+                            exclusions_list = item.exclusions.split(",")  # Dividir por comas como fallback
+                    else:
+                        exclusions_list = item.exclusions  # Ya es una lista
 
+                    exclusions_text = "\n".join([f"  - [SIN] {exclusion.strip()}" for exclusion in exclusions_list])
+                    item_text += f"\n{exclusions_text}"  # Agregar al texto del producto
+
+                # ✅ **Formatear instrucciones especiales**
                 if item.special_instructions:
-                    item_text += "\n  ! [NOTA]: " + item.special_instructions
+                    item_text += f"\n  ! [NOTA]: {item.special_instructions}"
 
                 productos_en_zona.append(item_text)  # ✅ **Agregar solo productos de la zona actual**
 
