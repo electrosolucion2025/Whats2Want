@@ -389,8 +389,8 @@ def generate_ticket_content(order, printer_zone):
                 print(f"🚫 Producto '{product.name}' no pertenece a la zona '{printer_zone.name}', omitiendo...", flush=True)
 
         # 🔹 Si no hay productos para esta zona, no generamos ticket
-        if not productos_en_zona:
-            return ""
+        #if not productos_en_zona:
+        #    return ""
 
         # **Encabezado de la zona**
         p._raw(b'\x1B\x61\x00')  # 🔹 Alinear a la izquierda
