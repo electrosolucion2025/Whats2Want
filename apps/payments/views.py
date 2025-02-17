@@ -1,5 +1,6 @@
 from itertools import chain
 import json
+import threading
 from turtle import width
 import uuid
 
@@ -99,7 +100,8 @@ def redsys_notify(request):
                 print(f"🔒 Sesión {chat_session.id} cerrada tras el pago del pedido {order.order_number}", flush=True)
             
             # 🖨️ **Generar los tickets de impresión**
-            process_successful_payment(order)
+            threading.Thread(target=process_successful_payment, args=(order,), daemon=True).start()
+            # process_successful_payment(order)
             print(f"🖨️ Tickets de impresión generados para el pedido {order.order_number}", flush=True)
 
             # 📩 **Enviar mensaje de confirmación al usuario**
@@ -215,46 +217,79 @@ def process_successful_payment(order):
     """
     Genera los tickets de impresión después de que el pago ha sido confirmado.
     """
-    print(f"✅ Generando tickets de impresión para el pedido {order.order_number}")
+    print(f"✅ Generando tickets de impresión para el pedido {order.order_number}", flush=True)
+
+    # 🔍 **Verificar si el pedido tiene productos**
+    items = order.items.all()
+    if not items:
+        print(f"⚠️ El pedido {order.order_number} no tiene productos. No se generarán tickets.", flush=True)
+        return False
+
+    print(f"📦 Productos en el pedido {order.order_number}: {[item.product.name for item in items]}", flush=True)
 
     # 🔍 **Obtener zonas de impresión únicas**
-    printer_zones = {
-        zone
-        for item in order.items.all()
-        for zone in chain(item.product.print_zones.all(), item.product.category.print_zones.all())
-    }
+    try:
+        printer_zones = {
+            zone
+            for item in items
+            for zone in chain(item.product.print_zones.all(), item.product.category.print_zones.all())
+        }
+
+        print(f"🔍🔍🔍🔍 Zonas de impresión obtenidas: {len(printer_zones)}", flush=True)
+    except Exception as e:
+        print(f"❌ Error obteniendo zonas de impresión: {e}", flush=True)
+        return False  # ❌ Si hay error, se interrumpe la impresión pero el flujo sigue
 
     if not printer_zones:
-        print(f"⚠️ No hay zonas de impresión asignadas para el pedido {order.order_number}. No se generarán tickets.")
-        return
+        print(f"⚠️ No hay zonas de impresión asignadas para el pedido {order.order_number}. No se generarán tickets.", flush=True)
+        return False  # 🔹 No hay zonas, no se imprime nada
 
     # 🖨️ **Generar tickets de impresión**
     tickets = []
     for zone in printer_zones:
-        ticket_content = generate_ticket_content(order, zone)
+        try:
+            print(f"🖨️ Generando contenido del ticket para la zona '{zone.name}'...", flush=True)
+            ticket_content = generate_ticket_content(order, zone)
 
-        # 📌 **Evitar guardar tickets vacíos**
-        if not ticket_content.strip():
-            print(f"⚠️ Ticket vacío para la zona '{zone.name}', omitiendo...")
-            continue
+            print(f"📃 Contenido del ticket para la zona '{zone.name}': {repr(ticket_content)}", flush=True)
 
-        tickets.append(PrintTicket(
-            tenant=order.tenant,
-            order=order,
-            printer_zone=zone,
-            content=ticket_content,
-            status="PENDING"
-        ))
+            # 📌 **Evitar guardar tickets vacíos**
+            if not ticket_content or not ticket_content.strip():
+                print(f"⚠️ Ticket vacío para la zona '{zone.name}', omitiendo...", flush=True)
+                continue
 
-        print(f"🖨️ Ticket generado para la zona '{zone.name}'")
+            print(f"✅ Agregando ticket a la lista: Zona: {zone.name}", flush=True)
+            tickets.append(PrintTicket(
+                tenant=order.tenant,
+                order=order,
+                printer_zone=zone,
+                content=ticket_content,
+                status="PENDING"
+            ))
+
+        except Exception as e:
+            print(f"❌ Error generando ticket para la zona '{zone.name}': {e}", flush=True)
 
     # 📌 **Guardar tickets en la base de datos**
     if tickets:
-        with transaction.atomic():
-            PrintTicket.objects.bulk_create(tickets)
-        print(f"✅ Se generaron {len(tickets)} tickets para el pedido {order.order_number}")
+        print(f"🔍 Tickets a guardar: {len(tickets)}", flush=True)
+        try:
+            with transaction.atomic():
+                for ticket in tickets:
+                    ticket.save()  # 🔥 Guardar uno por uno
+
+                    # 🔍 Confirmar que se guardó correctamente
+                    print(f"✅ Ticket guardado: {ticket.id} - Zona: {ticket.printer_zone}", flush=True)
+
+            print(f"✅ Se generaron {len(tickets)} tickets para el pedido {order.order_number}", flush=True)
+            return True
+        except Exception as e:
+            print(f"❌ Error guardando los tickets en la base de datos: {e}", flush=True)
+            return False
+
     else:
-        print(f"⚠️ No se generaron tickets válidos para el pedido {order.order_number}")
+        print(f"⚠️ No se generaron tickets válidos para el pedido {order.order_number}", flush=True)
+        return False  # 🔹 No hay tickets, pero el flujo sigue
     
 def generate_ticket_content(order, printer_zone):
     """
@@ -266,8 +301,10 @@ def generate_ticket_content(order, printer_zone):
     printer_port = printer_zone.printer_port
 
     try:
+        
         p = Network(printer_ip, printer_port)
-
+        
+        
         # **Encabezado (Nombre del negocio grande)**
         p._raw(b'\x1B\x61\x01')  # 🔹 Centrar texto
         # p._raw(b'\x1D\x21\x11')  # 🔹 Doble altura y ancho
@@ -303,40 +340,57 @@ def generate_ticket_content(order, printer_zone):
 
         for item in order.items.all():
             product = item.product
-            product_zones = product.print_zones.all() or product.category.print_zones.all()
+            product_zones = list(product.print_zones.all()) or list(product.category.print_zones.all())
+
+            print(f"📌 Producto: {product.name} - Zonas de impresión: {product_zones}", flush=True)
 
             # 🔍 **Verificar si el producto pertenece a la zona actual**
             if printer_zone in product_zones:
-                item_text = f"{item.quantity}x {item.product.name} - {item.product.price:.2f} Euros"
+                print(f"✅ Producto '{product.name}' pertenece a la zona '{printer_zone.name}'", flush=True)
 
+                item_text = f"{item.quantity}x {item.product.name} - {item.product.price:.2f} Euros"
+                
                 # ✅ **Formatear los extras en lista**
                 if item.extras:
-                    extras_text = "\n".join([f"  + {extra['name']} (+{extra['price']:.2f} Euros)" for extra in item.extras])
-                    item_text += f"\n{extras_text}"  # Se agrega a la siguiente línea
+                    try:
+                        extras_text = "\n".join([f"  + {extra['name']} (+{extra['price']:.2f} Euros)" for extra in item.extras])
+                        item_text += f"\n{extras_text}"  # Se agrega a la siguiente línea
+                        print(f"🔹 Extras añadidos a '{product.name}':\n{extras_text}", flush=True)
+                    except Exception as e:
+                        print(f"⚠️ Error formateando extras de '{product.name}': {e}", flush=True)
 
                 # ✅ **Formatear exclusiones en lista**
                 if item.exclusions:
-                    # 🔹 Si `item.exclusions` es una cadena JSON, la convertimos en lista
-                    if isinstance(item.exclusions, str):
-                        try:
+                    try:
+                        if isinstance(item.exclusions, str):
                             exclusions_list = json.loads(item.exclusions)  # Convertir de JSON a lista
-                        except json.JSONDecodeError:
-                            exclusions_list = item.exclusions.split(",")  # Dividir por comas como fallback
-                    else:
-                        exclusions_list = item.exclusions  # Ya es una lista
+                        else:
+                            exclusions_list = item.exclusions or []  # Asegurar que sea una lista
 
-                    exclusions_text = "\n".join([f"  - [SIN] {exclusion.strip()}" for exclusion in exclusions_list])
-                    item_text += f"\n{exclusions_text}"  # Agregar al texto del producto
+                        exclusions_text = "\n".join([f"  - [SIN] {exclusion.strip()}" for exclusion in exclusions_list if exclusion])
+                        item_text += f"\n{exclusions_text}"
+                        print(f"🔸 Exclusiones aplicadas a '{product.name}':\n{exclusions_text}", flush=True)
+                    except Exception as e:
+                        print(f"⚠️ Error formateando exclusiones de '{product.name}': {e}", flush=True)
 
                 # ✅ **Formatear instrucciones especiales**
                 if item.special_instructions:
-                    item_text += f"\n  ! [NOTA]: {item.special_instructions}"
+                    try:
+                        special_note = item.special_instructions.strip() if item.special_instructions else ''
+                        item_text += f"\n  ! [NOTA]: {special_note}"
+                        print(f"📢 Instrucciones especiales para '{product.name}': {special_note}", flush=True)
+                    except Exception as e:
+                        print(f"⚠️ Error formateando instrucciones especiales de '{product.name}': {e}", flush=True)
 
                 productos_en_zona.append(item_text)  # ✅ **Agregar solo productos de la zona actual**
+                print(f"🛒 Producto añadido al ticket de '{printer_zone.name}':\n{item_text}", flush=True)
+
+            else:
+                print(f"🚫 Producto '{product.name}' no pertenece a la zona '{printer_zone.name}', omitiendo...", flush=True)
 
         # 🔹 Si no hay productos para esta zona, no generamos ticket
-        if not productos_en_zona:
-            return ""
+        #if not productos_en_zona:
+        #    return ""
 
         # **Encabezado de la zona**
         p._raw(b'\x1B\x61\x00')  # 🔹 Alinear a la izquierda

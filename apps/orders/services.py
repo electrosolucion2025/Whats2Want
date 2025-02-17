@@ -1,5 +1,6 @@
 # Python standard library imports
 import uuid
+import threading
 from decimal import Decimal
 
 # Django imports
@@ -90,9 +91,9 @@ def save_order_to_db(order_data, session):
                 product=product,
                 quantity=quantity,
                 price=unit_price,
-                exclusions=", ".join(exclusions),
-                special_instructions=special_instructions,
-                extras=extras_list,
+                exclusions=", ".join(exclusions) if exclusions else "",
+                special_instructions=special_instructions or "",
+                extras=extras_list if extras_list else [],
                 discount=item_discount,
                 tax_amount=item_tax
             )
@@ -143,7 +144,8 @@ def save_order_to_db(order_data, session):
                 print(f"🔒 Sesión {chat_session.id} cerrada tras el pedido VIP {order.order_number}", flush=True)
 
             # 🖨️ **Generar los tickets de impresión**
-            process_successful_payment(order)
+            # process_successful_payment(order)
+            threading.Thread(target=process_successful_payment, args=(order,), daemon=True).start()
             print(f"🖨️ Tickets de impresión generados para el pedido VIP {order.order_number}", flush=True)
 
             # 📩 **Enviar mensaje de confirmación al usuario VIP**
