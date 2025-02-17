@@ -1,5 +1,6 @@
 from itertools import chain
 import json
+import threading
 from turtle import width
 import uuid
 
@@ -99,7 +100,8 @@ def redsys_notify(request):
                 print(f"🔒 Sesión {chat_session.id} cerrada tras el pago del pedido {order.order_number}", flush=True)
             
             # 🖨️ **Generar los tickets de impresión**
-            process_successful_payment(order)
+            threading.Thread(target=process_successful_payment, args=(order,), daemon=True).start()
+            # process_successful_payment(order)
             print(f"🖨️ Tickets de impresión generados para el pedido {order.order_number}", flush=True)
 
             # 📩 **Enviar mensaje de confirmación al usuario**
@@ -281,7 +283,7 @@ def generate_ticket_content(order, printer_zone):
 
     try:
         try:
-            p = Network(printer_ip, printer_port, timeout=5)
+            p = Network(printer_ip, printer_port)
         except Exception as e:
             print(f"❌ Error al conectar a la impresora en {printer_ip}:{printer_port}: {e}")
             return ""
@@ -334,21 +336,21 @@ def generate_ticket_content(order, printer_zone):
 
                 # ✅ **Formatear exclusiones en lista**
                 if item.exclusions:
-                    # 🔹 Si `item.exclusions` es una cadena JSON, la convertimos en lista
                     if isinstance(item.exclusions, str):
                         try:
                             exclusions_list = json.loads(item.exclusions)  # Convertir de JSON a lista
                         except json.JSONDecodeError:
                             exclusions_list = item.exclusions.split(",")  # Dividir por comas como fallback
                     else:
-                        exclusions_list = item.exclusions  # Ya es una lista
+                        exclusions_list = item.exclusions or []  # Asegurar que sea una lista
 
-                    exclusions_text = "\n".join([f"  - [SIN] {exclusion.strip()}" for exclusion in exclusions_list])
-                    item_text += f"\n{exclusions_text}"  # Agregar al texto del producto
+                    exclusions_text = "\n".join([f"  - [SIN] {exclusion.strip()}" for exclusion in exclusions_list if exclusion])
+                    item_text += f"\n{exclusions_text}"
 
                 # ✅ **Formatear instrucciones especiales**
                 if item.special_instructions:
-                    item_text += f"\n  ! [NOTA]: {item.special_instructions}"
+                    item_text += f"\n  ! [NOTA]: {item.special_instructions.strip() if item.special_instructions else ''}"
+
 
                 productos_en_zona.append(item_text)  # ✅ **Agregar solo productos de la zona actual**
 
